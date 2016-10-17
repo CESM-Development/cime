@@ -98,6 +98,9 @@ module prep_ocn_mod
   logical       :: flood_present  ! .true.  => rof is computing flood
   character(CS) :: vect_map       ! vector mapping type
   logical       :: x2o_average    ! logical for x2o averaging to 1 ocean instance from multi instances
+
+  logical       :: lwiso_runoff   ! logical is true if fldlist for ocn_calc_r2x_ox
+                                  ! should contain water isotops (16O, 18O, HDO)
   !================================================================================================
 
 contains
@@ -650,6 +653,7 @@ contains
        index_x2o_Faxa_snow_16O  = mct_aVect_indexRA(x2o_o,'Faxa_snow_16O' , perrWith='quiet')
        index_x2o_Faxa_prec_16O  = mct_aVect_indexRA(x2o_o,'Faxa_prec_16O' , perrWith='quiet')
        index_x2o_Foxx_rofl_16O  = mct_aVect_indexRA(x2o_o,'Foxx_rofl_16O' , perrWith='quiet')
+       lwiso_runoff = ( index_x2o_Foxx_rofl_16O /= 0 )
        index_x2o_Foxx_rofi_16O  = mct_aVect_indexRA(x2o_o,'Foxx_rofi_16O' , perrWith='quiet')
        ! H2_18O
        index_a2x_Faxa_snowc_18O = mct_aVect_indexRA(a2x_o,'Faxa_snowc_18O', perrWith='quiet')
@@ -988,7 +992,7 @@ contains
                                               g2x_o%rAttr(index_g2x_Fogg_rofi , n)) * flux_epbalfact
 
 
-       if ( index_x2o_Foxx_rofl_16O /= 0 ) then
+       if ( lwiso_runoff ) then
           x2o_o%rAttr(index_x2o_Foxx_rofl_16O, n) = (r2x_o%rAttr(index_r2x_Forr_rofl_16O, n) + &
                                                  r2x_o%rAttr(index_r2x_Flrr_flood, n) + &
                                                  g2x_o%rAttr(index_g2x_Fogg_rofl , n)) * flux_epbalfact
@@ -1183,6 +1187,8 @@ contains
   !================================================================================================
 
   subroutine prep_ocn_calc_r2x_ox(timer)
+
+    use shr_kind_mod, only : shr_kind_cs
     !---------------------------------------------------------------
     ! Description
     ! Create r2x_ox (note that r2x_ox is a local module variable)
@@ -1192,18 +1198,26 @@ contains
     !
     ! Local Variables
     integer :: eri
-    type(mct_avect), pointer :: r2x_rx
-    character(*), parameter  :: subname = '(prep_ocn_calc_r2x_ox)'
+    type(mct_avect), pointer   :: r2x_rx
+    character(len=shr_kind_cs) :: fldlistl, fldlisti
+    character(*), parameter    :: subname = '(prep_ocn_calc_r2x_ox)'
     !---------------------------------------------------------------
 
     call t_drvstartf (trim(timer),barrier=mpicom_CPLID)
+    if (lwiso_runoff) then
+      fldlistl='Forr_rofl:Forr_rofl_16O:Forr_rofl_18O:Forr_rofl_HDO'
+      fldlisti='Forr_rofi:Forr_rofi_16O:Forr_rofi_18O:Forr_rofi_HDO'
+    else
+      fldlistl='Forr_rofl'
+      fldlisti='Forr_rofi'
+    end if
     do eri = 1,num_inst_rof
        r2x_rx => component_get_c2x_cx(rof(eri))
        call seq_map_map(mapper_Rr2o_liq, r2x_rx, r2x_ox(eri), &
-            fldlist='Forr_rofl:Forr_rofl_16O:Forr_rofl_18O:Forr_rofl_HDO', norm=.false.)
+            fldlist=fldlistl, norm=.false.)
 
        call seq_map_map(mapper_Rr2o_ice, r2x_rx, r2x_ox(eri), &
-            fldlist='Forr_rofi:Forr_rofi_16O:Forr_rofi_18O:Forr_rofi_HDO', norm=.false.)
+            fldlist=fldlisti, norm=.false.)
 
        if (flood_present) then
           call seq_map_map(mapper_Fr2o, r2x_rx, r2x_ox(eri), &
