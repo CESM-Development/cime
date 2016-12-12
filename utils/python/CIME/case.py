@@ -11,7 +11,6 @@ from CIME.XML.standard_module_setup import *
 from CIME.utils                     import expect, get_cime_root, append_status
 from CIME.utils                     import convert_to_type, get_model, get_project
 from CIME.utils                     import get_build_threaded, get_current_commit
-from CIME.XML.build                 import Build
 from CIME.XML.machines              import Machines
 from CIME.XML.pes                   import Pes
 from CIME.XML.files                 import Files
@@ -116,7 +115,7 @@ class Case(object):
         logger.debug("total_tasks %s thread_count %s"%(total_tasks, self.thread_count))
         self.num_nodes = env_mach_pes.get_total_nodes(total_tasks, self.thread_count)
         self.tasks_per_numa = int(math.ceil(self.tasks_per_node / 2.0))
-        smt_factor = self.get_value("MAX_TASKS_PER_NODE")/self.get_value("PES_PER_NODE")
+        smt_factor = max(1,int(self.get_value("MAX_TASKS_PER_NODE")/self.get_value("PES_PER_NODE")))
 
         self.cores_per_task = ((self.get_value("MAX_TASKS_PER_NODE")/smt_factor) \
                                / self.tasks_per_node) * 2
@@ -812,42 +811,6 @@ class Case(object):
             except Exception as e:
                 logger.warning("FAILED to set up toolfiles: %s %s %s" % (str(e), toolfile, destfile))
 
-        # Create Macros file.
-        machine = self.get_value("MACH")
-        files = Files()
-        # Use config_build if the environment variable is set, or if there is no
-        # config_compilers file.
-        if os.getenv("CIME_USE_CONFIG_BUILD") == "TRUE" or \
-           files.get_value("COMPILERS_SPEC_FILE") is None:
-            build_file = files.get_value("BUILD_SPEC_FILE")
-            machobj = Machines(machine=machine, files=files)
-            macro_maker = Build(machobj)
-            macros_path = os.path.join(self._caseroot, "Macros")
-            with open(macros_path, "w") as macros_file:
-                macro_maker.write_macros('Makefile', build_file, macros_file)
-
-        # Copy any system or compiler Depends files to the case.
-        compiler = self.get_value("COMPILER")
-        for dep in (machine, compiler):
-            dfile = "Depends.%s"%dep
-            if os.path.isfile(os.path.join(machines_dir,dfile)):
-                shutil.copyfile(os.path.join(machines_dir,dfile), os.path.join(self._caseroot,dfile))
-        dfile = "Depends.%s.%s"%(machine,compiler)
-        if os.path.isfile(os.path.join(machines_dir,dfile)):
-            shutil.copyfile(os.path.join(machines_dir,dfile), os.path.join(self._caseroot, dfile))
-            # set up infon files
-            # infofiles = os.path.join(os.path.join(toolsdir, README.post_process")
-            #FIXME - the following does not work
-            # print "DEBUG: infofiles are ",infofiles
-            #    try:
-            #        for infofile in infofiles:
-            #            print "DEBUG: infofile is %s, %s"  %(infofile, os.path.basename(infofile))
-            #            dst_file = caseroot + "/" + os.path.basename(infofile)
-            #            shutil.copyfile(infofile, dst_file)
-            #            os.chmod(dst_file, os.stat(dst_file).st_mode | stat.S_IXUSR | stat.S_IXGRP)
-            #    except Exception as e:
-            #        logger.warning("FAILED to set up infofiles: %s" % str(e))
-
     def _create_caseroot_sourcemods(self):
         components = self.get_compset_components()
         for component in components:
@@ -971,9 +934,10 @@ class Case(object):
         newcase.create_caseroot(clone=True)
         newcase.flush(flushall=True)
 
-        # copy user_nl_files
+        # copy user_ files
         cloneroot = self._caseroot
-        files = glob.glob(cloneroot + '/user_nl_*')
+        files = glob.glob(cloneroot + '/user_*')
+
         for item in files:
             shutil.copy(item, newcaseroot)
 
@@ -1054,7 +1018,7 @@ class Case(object):
     def load_env(self):
         if not self._is_env_loaded:
             compiler = self.get_value("COMPILER")
-            debug=self.get_value("DEBUG"),
+            debug=self.get_value("DEBUG")
             mpilib=self.get_value("MPILIB")
             env_module = self.get_env("mach_specific")
             env_module.load_env(compiler=compiler,debug=debug, mpilib=mpilib)

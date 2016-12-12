@@ -4,7 +4,7 @@ API for preview namelist
 
 from CIME.XML.standard_module_setup import *
 
-import glob, shutil
+import glob, shutil, imp
 logger = logging.getLogger(__name__)
 
 def create_dirs(case):
@@ -60,8 +60,27 @@ def create_namelists(case):
         model_str = model.lower()
         config_file = case.get_value("CONFIG_%s_FILE" % model_str.upper())
         config_dir = os.path.dirname(config_file)
+        if model_str == "drv":
+            compname = "drv"
+        else:
+            compname = case.get_value("COMP_%s" % model_str.upper())
         cmd = os.path.join(config_dir, "buildnml")
-        run_cmd_no_fail("%s %s" % (cmd, caseroot), verbose=True)
+        try:
+            mod = imp.load_source("buildnml", cmd)
+            logger.info("Calling %s buildnml"%compname)
+            mod.buildnml(case, caseroot, compname)
+
+        except SyntaxError as detail:
+            with open(cmd, 'r') as f:
+                first_line = f.readline()
+            if 'python' in first_line:
+                expect(False, detail)
+            else:
+                run_cmd_no_fail("%s %s" % (cmd, caseroot), verbose=True)
+        except AttributeError:
+            run_cmd_no_fail("%s %s" % (cmd, caseroot), verbose=True)
+        except:
+            raise
 
     # refresh case xml object from file
     case.read_xml()
