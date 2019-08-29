@@ -91,6 +91,11 @@
     <lname>5505_CAM5%WCCM_CLM45%BGC_CICE_POP2_RTM_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>B1850C5WCCML45BGCR</alias>
+    <lname>1850_CAM5%WCCM_CLM45%BGC_CICE_POP2_RTM_SGLC_SWAV</lname>
+  </compset>
+
 
 
 

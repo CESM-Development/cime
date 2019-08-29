@@ -214,8 +214,8 @@ def case_run(case):
         run_model(case)
         post_run_check(case, lid)
         save_logs(case, lid)       # Copy log files back to caseroot
-        if case.get_value("CHECK_TIMING") or case.get_value("SAVE_TIMING"):
-            get_timing(case, lid)     # Run the getTiming script
+        #if case.get_value("CHECK_TIMING") or case.get_value("SAVE_TIMING"):
+        #    get_timing(case, lid)     # Run the getTiming script
 
         if data_assimilation:
             do_data_assimilation(data_assimilation_script, case.get_value("CASEROOT"), cycle, lid)
