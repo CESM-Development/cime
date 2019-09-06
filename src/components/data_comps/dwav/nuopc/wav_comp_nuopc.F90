@@ -5,25 +5,35 @@ module wav_comp_nuopc
   !----------------------------------------------------------------------------
 
   use ESMF
-  use NUOPC            , only : NUOPC_CompDerive, NUOPC_CompSetEntryPoint, NUOPC_CompSpecialize
-  use NUOPC            , only : NUOPC_CompAttributeGet, NUOPC_Advertise
-  use NUOPC_Model      , only : model_routine_SS        => SetServices
-  use NUOPC_Model      , only : model_label_Advance     => label_Advance
-  use NUOPC_Model      , only : model_label_SetRunClock => label_SetRunClock
-  use NUOPC_Model      , only : model_label_Finalize    => label_Finalize
-  use NUOPC_Model      , only : NUOPC_ModelGet
-  use shr_file_mod     , only : shr_file_getlogunit, shr_file_setlogunit
-  use shr_kind_mod     , only : r8=>shr_kind_r8, i8=>shr_kind_i8, cl=>shr_kind_cl, cs=>shr_kind_cs
-  use shr_cal_mod      , only : shr_cal_noleap, shr_cal_gregorian, shr_cal_ymd2date
-  use shr_const_mod    , only : SHR_CONST_SPVAL
-  use shr_sys_mod      , only : shr_sys_abort
-  use dshr_nuopc_mod   , only : fld_list_type, fldsMax, dshr_realize
-  use dshr_nuopc_mod   , only : ModelInitPhase, ModelSetRunClock, ModelSetMetaData
-  use dshr_methods_mod , only : chkerr, state_setscalar,  state_diagnose, alarmInit, memcheck
-  use dshr_methods_mod , only : set_component_logging, get_component_instance, log_clock_advance
-  use dwav_shr_mod     , only : dwav_shr_read_namelists
-  use dwav_comp_mod    , only : dwav_comp_init, dwav_comp_run, dwav_comp_advertise
-  use dwav_comp_mod    , only : dwav_comp_export
+  use NUOPC                 , only : NUOPC_CompDerive, NUOPC_CompSetEntryPoint, NUOPC_CompSpecialize
+  use NUOPC                 , only : NUOPC_CompAttributeGet, NUOPC_Advertise
+  use NUOPC_Model           , only : model_routine_SS        => SetServices
+  use NUOPC_Model           , only : model_label_Advance     => label_Advance
+  use NUOPC_Model           , only : model_label_SetRunClock => label_SetRunClock
+  use NUOPC_Model           , only : model_label_Finalize    => label_Finalize
+  use NUOPC_Model           , only : NUOPC_ModelGet
+  use med_constants_mod     , only : IN, R8, I8, CXX, CL
+  use med_constants_mod     , only : shr_file_getlogunit, shr_file_setlogunit
+  use med_constants_mod     , only : shr_file_getloglevel, shr_file_setloglevel
+  use med_constants_mod     , only : shr_file_setIO, shr_file_getUnit
+  use med_constants_mod     , only : shr_cal_ymd2date, shr_cal_noleap, shr_cal_gregorian
+  use shr_nuopc_scalars_mod , only : flds_scalar_name
+  use shr_nuopc_scalars_mod , only : flds_scalar_num
+  use shr_nuopc_scalars_mod , only : flds_scalar_index_nx
+  use shr_nuopc_scalars_mod , only : flds_scalar_index_ny
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_Clock_TimePrint
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_ChkErr
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_SetScalar
+  use shr_nuopc_methods_mod , only : shr_nuopc_methods_State_Diagnose
+  use shr_nuopc_grid_mod    , only : shr_nuopc_grid_Meshinit
+  use shr_nuopc_grid_mod    , only : shr_nuopc_grid_ArrayToState
+  use shr_nuopc_grid_mod    , only : shr_nuopc_grid_StateToArray
+  use shr_strdata_mod       , only : shr_strdata_type
+  use dshr_nuopc_mod        , only : fld_list_type, fldsMax, fld_list_realize
+  use dshr_nuopc_mod        , only : ModelInitPhase, ModelSetRunClock, ModelSetMetaData
+  use dwav_shr_mod          , only : dwav_shr_read_namelists
+  use dwav_comp_mod         , only : dwav_comp_init, dwav_comp_run, dwav_comp_advertise
+  use mct_mod
 
   implicit none
   private ! except
@@ -39,29 +49,39 @@ module wav_comp_nuopc
   ! Private module data
   !--------------------------------------------------------------------------
 
-  character(len=CS)       :: flds_scalar_name = ''
-  integer                 :: flds_scalar_num = 0
-  integer                 :: flds_scalar_index_nx = 0
-  integer                 :: flds_scalar_index_ny = 0
-
-  integer                 :: fldsToWav_num = 0
-  integer                 :: fldsFrWav_num = 0
-  type (fld_list_type)    :: fldsToWav(fldsMax)
-  type (fld_list_type)    :: fldsFrWav(fldsMax)
-
-  integer                 :: compid                    ! mct comp id
-  integer                 :: mpicom                    ! mpi communicator
-  integer                 :: my_task                   ! my task in mpi communicator mpicom
-  character(len=16)       :: inst_suffix = ""          ! char string associated with instance (ie. "_0001" or "")
-  integer                 :: logunit                   ! logging unit number
-  integer    ,parameter   :: master_task=0             ! task number of master task
-  logical                 :: read_restart              ! start from restart
-  character(len=256)      :: case_name                 ! case name
-  character(len=80)       :: calendar                  ! calendar name
-  logical                 :: wav_prognostic            ! flag
-  logical                 :: use_esmf_metadata = .false.
-  character(*), parameter :: modName =  "(wav_comp_nuopc)"
-  character(*), parameter :: u_FILE_u = &
+  integer                    :: fldsToWav_num = 0
+  integer                    :: fldsFrWav_num = 0
+  type (fld_list_type)       :: fldsToWav(fldsMax)
+  type (fld_list_type)       :: fldsFrWav(fldsMax)
+  character(len=3)           :: myModelName = 'wav'       ! user defined model name
+  type(shr_strdata_type)     :: SDWAV
+  type(mct_gsMap), target    :: gsMap_target
+  type(mct_gGrid), target    :: ggrid_target
+  type(mct_gsMap), pointer   :: gsMap
+  type(mct_gGrid), pointer   :: ggrid
+  type(mct_aVect)            :: x2d
+  type(mct_aVect)            :: d2x
+  integer                    :: compid                    ! mct comp id
+  integer                    :: mpicom                    ! mpi communicator
+  integer                    :: my_task                   ! my task in mpi communicator mpicom
+  integer                    :: inst_index                ! number of current instance (ie. 1)
+  character(len=16)          :: inst_name                 ! fullname of current instance (ie. "wav_0001")
+  character(len=16)          :: inst_suffix = ""          ! char string associated with instance (ie. "_0001" or "")
+  integer                    :: logunit                   ! logging unit number
+  integer    ,parameter      :: master_task=0             ! task number of master task
+  integer                    :: localPet
+  logical                    :: read_restart              ! start from restart
+  character(len=256)         :: case_name                 ! case name
+  character(CL)              :: tmpstr                    ! tmp string
+  integer                    :: dbrc
+  integer, parameter         :: dbug = 10
+  character(len=80)          :: calendar                  ! calendar name
+  character(CXX)             :: flds_w2x = ''
+  character(CXX)             :: flds_x2w = ''
+  logical                    :: wav_prognostic ! flag
+  logical                    :: use_esmf_metadata = .false.
+  character(*), parameter    :: modName =  "(wav_comp_nuopc)"
+  character(*), parameter    :: u_FILE_u = &
        __FILE__
 
 !===============================================================================
@@ -71,53 +91,53 @@ contains
   subroutine SetServices(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
-
     character(len=*),parameter  :: subname=trim(modName)//':(SetServices) '
     !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
-    call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO)
+    if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
 
     ! the NUOPC gcomp component will register the generic methods
     call NUOPC_CompDerive(gcomp, model_routine_SS, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! switching to IPD versions
     call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
          userRoutine=ModelInitPhase, phase=0, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! set entry point for methods that require specific implementation
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
          phaseLabelList=(/"IPDv01p1"/), userRoutine=InitializeAdvertise, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
          phaseLabelList=(/"IPDv01p3"/), userRoutine=InitializeRealize, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     ! attach specializing method(s)
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Advance, specRoutine=ModelAdvance, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_MethodRemove(gcomp, label=model_label_SetRunClock, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_SetRunClock, specRoutine=ModelSetRunClock, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompSpecialize(gcomp, specLabel=model_label_Finalize, specRoutine=ModelFinalize, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO)
+    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine SetServices
 
   !===============================================================================
 
   subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
+    use shr_nuopc_utils_mod, only : shr_nuopc_set_component_logging
+    use shr_nuopc_utils_mod, only : shr_nuopc_get_component_instance
 
-    ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -131,104 +151,65 @@ contains
     integer            :: n
     integer            :: ierr        ! error code
     integer            :: shrlogunit  ! original log unit
-    integer            :: localPet
-    integer            :: inst_index  ! number of current instance (ie. 1)
-    character(len=CL)  :: fileName    ! generic file name
-    character(len=CL)  :: logmsg
-    logical            :: isPresent, isSet
+    integer            :: shrloglev   ! original log level
+    logical            :: isPresent
+    character(len=512) :: diro
+    character(len=512) :: logfile
     character(len=*),parameter  :: subname=trim(modName)//':(InitializeAdvertise) '
     !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
-    call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO)
+    if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
 
     !----------------------------------------------------------------------------
     ! generate local mpi comm
     !----------------------------------------------------------------------------
 
     call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call ESMF_VMGet(vm, mpiCommunicator=lmpicom, localpet=my_task, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call mpi_comm_dup(lmpicom, mpicom, ierr)
-
     !----------------------------------------------------------------------------
     ! determine instance information
     !----------------------------------------------------------------------------
 
-    call get_component_instance(gcomp, inst_suffix, inst_index, rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_get_component_instance(gcomp, inst_suffix, inst_index)
+    inst_name = "WAV"//trim(inst_suffix)
 
     !----------------------------------------------------------------------------
     ! set logunit and set shr logging to my log file
     !----------------------------------------------------------------------------
 
-    call set_component_logging(gcomp, my_task==master_task, logunit, shrlogunit, rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_set_component_logging(gcomp, my_task==master_task, logunit, shrlogunit, shrloglev)
 
     !----------------------------------------------------------------------------
     ! Read input namelists and set present and prognostic flags
     !----------------------------------------------------------------------------
 
-    filename = "dwav_in"//trim(inst_suffix)
-    call dwav_shr_read_namelists(filename, mpicom, my_task, master_task, &
-         logunit, wav_present, wav_prognostic)
+    call dwav_shr_read_namelists(mpicom, my_task, master_task, &
+         inst_index, inst_suffix, inst_name,  &
+         logunit, shrlogunit, SDWAV, wav_present, wav_prognostic)
 
     !--------------------------------
     ! advertise import and export fields
     !--------------------------------
 
-    call NUOPC_CompAttributeGet(gcomp, name="ScalarFieldName", value=cvalue, isPresent=isPresent, isSet=isSet, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (isPresent .and. isSet) then
-       flds_scalar_name = trim(cvalue)
-       call ESMF_LogWrite(trim(subname)//' flds_scalar_name = '//trim(flds_scalar_name), ESMF_LOGMSG_INFO)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    call NUOPC_CompAttributeGet(gcomp, name="ScalarFieldCount", value=cvalue, isPresent=isPresent, isSet=isSet, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (isPresent .and. isSet) then
-       read(cvalue, *) flds_scalar_num
-       write(logmsg,*) flds_scalar_num
-       call ESMF_LogWrite(trim(subname)//' flds_scalar_num = '//trim(logmsg), ESMF_LOGMSG_INFO)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    call NUOPC_CompAttributeGet(gcomp, name="ScalarFieldIdxGridNX", value=cvalue, isPresent=isPresent, isSet=isSet, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (isPresent .and. isSet) then
-       read(cvalue,*) flds_scalar_index_nx
-       write(logmsg,*) flds_scalar_index_nx
-       call ESMF_LogWrite(trim(subname)//' : flds_scalar_index_nx = '//trim(logmsg), ESMF_LOGMSG_INFO)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    call NUOPC_CompAttributeGet(gcomp, name="ScalarFieldIdxGridNY", value=cvalue, isPresent=isPresent, isSet=isSet, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    if (isPresent .and. isSet) then
-       read(cvalue,*) flds_scalar_index_ny
-       write(logmsg,*) flds_scalar_index_ny
-       call ESMF_LogWrite(trim(subname)//' : flds_scalar_index_ny = '//trim(logmsg), ESMF_LOGMSG_INFO)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    endif
-
-    write(6,*)'DEBUG: wav index nx = ', flds_scalar_index_nx
-    write(6,*)'DEBUG: wav index ny = ', flds_scalar_index_ny
-
-    call dwav_comp_advertise(importState, exportState, flds_scalar_name, &
+    call dwav_comp_advertise(importState, exportState, &
          wav_present, wav_prognostic, &
-         fldsFrWav_num, fldsFrWav, fldsToWav_num, fldsToWav, rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+         fldsFrWav_num, fldsFrWav, fldsToWav_num, fldsToWav, &
+         flds_w2x, flds_x2w, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO)
+    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
     !----------------------------------------------------------------------------
     ! Reset shr logging to original values
     !----------------------------------------------------------------------------
 
+    call shr_file_setLogLevel(shrloglev)
     call shr_file_setLogUnit (shrlogunit)
 
   end subroutine InitializeAdvertise
@@ -236,8 +217,6 @@ contains
   !===============================================================================
 
   subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
-
-    ! input/output variables 
     type(ESMF_GridComp)  :: gcomp
     type(ESMF_State)     :: importState, exportState
     type(ESMF_Clock)     :: clock
@@ -249,25 +228,36 @@ contains
     type(ESMF_TimeInterval) :: timeStep
     type(ESMF_Calendar)     :: esmf_calendar             ! esmf calendar
     type(ESMF_CalKind_Flag) :: esmf_caltype              ! esmf calendar type
+    integer                 :: nx_global, ny_global
+    type(ESMF_VM)           :: vm
+    integer                 :: n
+    character(CL)           :: cvalue
+    integer                 :: shrlogunit   ! original log unit
+    integer                 :: shrloglev    ! original log level
+    integer                 :: ierr         ! error code
+    integer                 :: klon, klat
+    integer                 :: lsize
+    integer                 :: iam
+    real(r8), pointer       :: lon(:),lat(:)
+    integer , pointer       :: gindex(:)
     integer                 :: current_ymd  ! model date
     integer                 :: current_year ! model year
     integer                 :: current_mon  ! model month
     integer                 :: current_day  ! model day
     integer                 :: current_tod  ! model sec into model date
-    character(CL)           :: cvalue
-    integer                 :: shrlogunit   ! original log unit
-    integer                 :: nxg, nyg
     character(len=*),parameter :: subname=trim(modName)//':(InitializeRealize) '
     !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
-    call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO)
+    if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
 
     !----------------------------------------------------------------------------
     ! Reset shr logging to my log file
     !----------------------------------------------------------------------------
 
     call shr_file_getLogUnit (shrlogunit)
+    call shr_file_getLogLevel(shrloglev)
+    call shr_file_setLogLevel(max(shrloglev,1))
     call shr_file_setLogUnit (logUnit)
 
     !--------------------------------
@@ -275,59 +265,83 @@ contains
     !--------------------------------
 
     call NUOPC_CompAttributeGet(gcomp, name='case_name', value=case_name, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call NUOPC_CompAttributeGet(gcomp, name='read_restart', value=cvalue, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) read_restart
 
     call NUOPC_CompAttributeGet(gcomp, name='MCTID', value=cvalue, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) compid
 
     !----------------------------------------------------------------------------
     ! Determine calendar info
     !----------------------------------------------------------------------------
 
-    call ESMF_ClockGet( clock, currTime=currTime, timeStep=timeStep, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    call ESMF_TimeGet( currTime, yy=current_year, mm=current_mon, dd=current_day, s=current_tod, &
-         calkindflag=esmf_caltype, rc=rc )
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call shr_cal_ymd2date(current_year, current_mon, current_day, current_ymd)
+    call ESMF_ClockGet( clock, calkindflag=esmf_caltype, rc=rc )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (esmf_caltype == ESMF_CALKIND_NOLEAP) then
        calendar = shr_cal_noleap
     else if (esmf_caltype == ESMF_CALKIND_GREGORIAN) then
        calendar = shr_cal_gregorian
     else
-       call ESMF_LogWrite(subname//" ERROR bad ESMF calendar name "//trim(calendar), ESMF_LOGMSG_ERROR)
+       call ESMF_LogWrite(subname//" ERROR bad ESMF calendar name "//trim(calendar), &
+            ESMF_LOGMSG_ERROR, rc=dbrc)
        rc = ESMF_Failure
        return
     end if
 
     !--------------------------------
-    ! Generate the mesh
-    !--------------------------------
-
-    call NUOPC_CompAttributeGet(gcomp, name='mesh_wav', value=cvalue, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    if (my_task == master_task) then
-       write(logunit,*) " obtaining dwav mesh from " // trim(cvalue)
-    end if
-
-    Emesh = ESMF_MeshCreate(filename=trim(cvalue), fileformat=ESMF_FILEFORMAT_ESMFMESH, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-
-    !--------------------------------
     ! Initialize model
     !--------------------------------
 
-    call dwav_comp_init(mpicom, compid, my_task, master_task, &
-         inst_suffix, logunit, read_restart, &
-         current_ymd, current_tod, calendar, EMesh, nxg, nyg)
+    gsmap => gsmap_target
+    ggrid => ggrid_target
+
+    call dwav_comp_init(&
+         x2w=x2d, &
+         w2x=d2x, &
+         w2x_fields=flds_w2x, &
+         x2w_fields=flds_x2w, &
+         SDWAV=SDWAV, &
+         gsmap=gsmap, &
+         ggrid=ggrid, &
+         mpicom=mpicom, &
+         compid=compid, &
+         my_task=my_task, &
+         master_task=master_task, &
+         inst_suffix=inst_suffix, &
+         inst_name=inst_name, &
+         logunit=logunit, &
+         read_restart=read_restart, &
+         calendar=calendar)
+
+    !--------------------------------
+    ! generate the grid or mesh from the gsmap and ggrid
+    ! grid_option specifies grid or mesh
+    !--------------------------------
+
+    nx_global = SDWAV%nxg
+    ny_global = SDWAV%nyg
+    lsize = mct_gsMap_lsize(gsMap, mpicom)
+    allocate(lon(lsize))
+    allocate(lat(lsize))
+    allocate(gindex(lsize))
+    klat = mct_aVect_indexRA(ggrid%data, 'lat')
+    klon = mct_aVect_indexRA(ggrid%data, 'lon')
+    call mpi_comm_rank(mpicom, iam, ierr)
+    call mct_gGrid_exportRattr(ggrid,'lon',lon,lsize)
+    call mct_gGrid_exportRattr(ggrid,'lat',lat,lsize)
+    call mct_gsMap_OrderedPoints(gsMap_target, iam, gindex)
+
+    call shr_nuopc_grid_MeshInit(gcomp, nx_global, ny_global, mpicom, gindex, lon, lat, Emesh, rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    deallocate(lon)
+    deallocate(lat)
+    deallocate(gindex)
 
     !--------------------------------
     ! realize the actively coupled fields, now that a mesh is established
@@ -335,7 +349,7 @@ contains
     ! by replacing the advertised fields with the newly created fields of the same name.
     !--------------------------------
 
-    call dshr_realize( &
+    call fld_list_realize( &
          state=ExportState, &
          fldList=fldsFrWav, &
          numflds=fldsFrWav_num, &
@@ -343,26 +357,75 @@ contains
          flds_scalar_num=flds_scalar_num, &
          tag=subname//':dwavExport',&
          mesh=Emesh, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call fld_list_realize( &
+         state=importState, &
+         fldList=fldsToWav, &
+         numflds=fldsToWav_num, &
+         flds_scalar_name=flds_scalar_name, &
+         flds_scalar_num=flds_scalar_num, &
+         tag=subname//':dwavImport',&
+         mesh=Emesh, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+
+    !----------------------------------------------------------------------------
+    ! Set initial wav state
+    !----------------------------------------------------------------------------
+
+    call ESMF_ClockGet( clock, currTime=currTime, rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call ESMF_TimeGet( currTime, yy=current_year, mm=current_mon, dd=current_day, s=current_tod, &
+         calkindflag=esmf_caltype, rc=rc )
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_cal_ymd2date(current_year, current_mon, current_day, current_ymd)
+
+    call dwav_comp_run(&
+         x2w=x2d, &
+         w2x=d2x, &
+         SDWAV=SDWAV, &
+         gsmap=gsmap, &
+         ggrid=ggrid, &
+         mpicom=mpicom, &
+         my_task=my_task, &
+         master_task=master_task, &
+         inst_suffix=inst_suffix, &
+         logunit=logunit, &
+         read_restart=read_restart, &
+         write_restart=.false., &
+         target_ymd=current_ymd, &
+         target_tod=current_tod)
 
     !--------------------------------
     ! Pack export state
     !--------------------------------
 
-    call dwav_comp_export(exportState, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_w2x, exportState, grid_option='mesh', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call State_SetScalar(dble(nxg),flds_scalar_index_nx, exportState, &
+    call shr_nuopc_methods_State_SetScalar(dble(nx_global),flds_scalar_index_nx, exportState, mpicom, &
          flds_scalar_name, flds_scalar_num, rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call State_SetScalar(dble(nyg),flds_scalar_index_ny, exportState, &
+    call shr_nuopc_methods_State_SetScalar(dble(ny_global),flds_scalar_index_ny, exportState, mpicom, &
          flds_scalar_name, flds_scalar_num, rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    call State_diagnose(exportState, subname//':ES', rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    !--------------------------------
+    ! diagnostics
+    !--------------------------------
 
+    if (dbug > 1) then
+       if (my_task == master_task) then
+          call mct_aVect_info(2, d2x, istr='initial diag'//':AV')
+       end if
+       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    endif
+
+    call shr_file_setLogLevel(shrloglev)
     call shr_file_setLogUnit (shrlogunit)
 
     !----------------------------------------------------------------------------
@@ -371,18 +434,16 @@ contains
 
     if (use_esmf_metadata) then
        call ModelSetMetaData(gcomp, name='DWAV', rc=rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
-    call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO)
+    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine InitializeRealize
 
   !===============================================================================
 
   subroutine ModelAdvance(gcomp, rc)
-
-    ! input/output variables
     type(ESMF_GridComp)  :: gcomp
     integer, intent(out) :: rc
 
@@ -393,6 +454,7 @@ contains
     type(ESMF_TimeInterval) :: timeStep
     type(ESMF_State)        :: importState, exportState
     integer                 :: shrlogunit    ! original log unit
+    integer                 :: shrloglev     ! original log level
     logical                 :: write_restart ! write a restart
     integer                 :: yr            ! year
     integer                 :: mon           ! month
@@ -403,11 +465,11 @@ contains
     !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
-
-    call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO)
-
-    call memcheck(subname, 3, my_task==master_task)
+    if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
+    call shr_nuopc_memcheck(subname, 3, my_task==master_task)
     call shr_file_getLogUnit (shrlogunit)
+    call shr_file_getLogLevel(shrloglev)
+    call shr_file_setLogLevel(max(shrloglev,1))
     call shr_file_setLogUnit (logunit)
 
     !--------------------------------
@@ -415,14 +477,21 @@ contains
     !--------------------------------
 
     call NUOPC_ModelGet(gcomp, modelClock=clock, importState=importState, exportState=exportState, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    if (dbug > 1) then
+       if (my_task == master_task) then
+          call shr_nuopc_methods_Clock_TimePrint(clock,subname//'clock',rc=rc)
+       end if
+    endif
 
     !--------------------------------
     ! Unpack import state
     !--------------------------------
 
     if (wav_prognostic) then
-       ! no import data for now
+       call shr_nuopc_grid_StateToArray(importState, x2d%rattr, flds_x2w, grid_option='mesh', rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
     !--------------------------------
@@ -432,13 +501,13 @@ contains
     ! Determine if will write restart
 
     call ESMF_ClockGetAlarm(clock, alarmname='alarm_restart', alarm=alarm, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     if (ESMF_AlarmIsRinging(alarm, rc=rc)) then
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
        write_restart = .true.
        call ESMF_AlarmRingerOff( alarm, rc=rc )
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     else
        write_restart = .false.
     endif
@@ -448,38 +517,60 @@ contains
     ! shr_strdata time interpolation
 
     call ESMF_ClockGet( clock, currTime=currTime, timeStep=timeStep, rc=rc )
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     nextTime = currTime + timeStep
     call ESMF_TimeGet( nextTime, yy=yr, mm=mon, dd=day, s=next_tod, rc=rc )
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     call shr_cal_ymd2date(yr, mon, day, next_ymd)
 
-    call dwav_comp_run(mpicom, my_task, master_task, &
-         inst_suffix, logunit, read_restart, write_restart, &
-         next_ymd, next_tod, case_name=case_name)
+    call dwav_comp_run(&
+         x2w=x2d, &
+         w2x=d2x, &
+         SDWAV=SDWAV, &
+         gsmap=gsmap, &
+         ggrid=ggrid, &
+         mpicom=mpicom, &
+         my_task=my_task, &
+         master_task=master_task, &
+         inst_suffix=inst_suffix, &
+         logunit=logunit, &
+         read_restart=read_restart, &
+         write_restart=write_restart, &
+         target_ymd=next_ymd, &
+         target_tod=next_tod, &
+         case_name=case_name)
 
     !--------------------------------
     ! Pack export state
     !--------------------------------
 
-    call dwav_comp_export(exportState, rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call shr_nuopc_grid_ArrayToState(d2x%rattr, flds_w2x, exportState, grid_option='mesh', rc=rc)
+    if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
 
     !--------------------------------
     ! diagnostics
     !--------------------------------
 
-    call State_diagnose(exportState, subname//':ES', rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    if (dbug > 1) then
+       if (my_task == master_task) then
+          call mct_aVect_info(2, d2x, istr='initial diag'//':AV')
+       end if
+       call shr_nuopc_methods_State_diagnose(exportState,subname//':ES',rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+    endif
 
     if (my_task == master_task) then
-       call log_clock_advance(clock, 'DATM', logunit, rc)
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call ESMF_ClockPrint(clock, options="currTime", preString="------>Advancing WAV from: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
+
+       call ESMF_ClockPrint(clock, options="stopTime", preString="--------------------------------> to: ", rc=rc)
+       if (shr_nuopc_methods_ChkErr(rc,__LINE__,u_FILE_u)) return
     end if
 
-    call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO)
+    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
+    call shr_file_setLogLevel(shrloglev)
     call shr_file_setLogUnit (shrlogunit)
 
   end subroutine ModelAdvance
@@ -497,13 +588,13 @@ contains
     !-------------------------------------------------------------------------------
 
     rc = ESMF_SUCCESS
-    call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO)
+    if (dbug > 5) call ESMF_LogWrite(subname//' called', ESMF_LOGMSG_INFO, rc=dbrc)
     if (my_task == master_task) then
        write(logunit,F91)
-       write(logunit,F00) ' dwav : end of main integration loop'
+       write(logunit,F00) trim(myModelName),': end of main integration loop'
        write(logunit,F91)
     end if
-    call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO)
+    if (dbug > 5) call ESMF_LogWrite(subname//' done', ESMF_LOGMSG_INFO, rc=dbrc)
 
   end subroutine ModelFinalize
 

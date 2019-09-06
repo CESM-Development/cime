@@ -16,7 +16,7 @@ import itertools
 from itertools import islice
 from EET import exhaustive_test
 from scipy import linalg as sla
-#import pdb
+
 
 #
 # Parse header file of a netcdf to get the variable 3d/2d/1d list
@@ -57,15 +57,14 @@ def calc_rmsz(o_files,var_name3d,var_name2d,is_SE,opts_dict):
       ens_stddev3d=np.zeros((len(var_name3d),nlev,ncol),dtype=np.float32)
       ens_avg2d=np.zeros((len(var_name2d),ncol),dtype=np.float32)
       ens_stddev2d=np.zeros((len(var_name2d),ncol),dtype=np.float32)
-    else: #not SE
+    else:
       if 'nlon' in input_dims:
          nlon = input_dims["nlon"]
          nlat = input_dims["nlat"]
       elif 'lon' in input_dims:
          nlon = input_dims["lon"]
          nlat = input_dims["lat"]
-
-
+       
       npts2d=nlat*nlon
       npts3d=nlev*nlat*nlon
       output3d = np.zeros((len(o_files),nlev,nlat,nlon),dtype=np.float32)
@@ -92,8 +91,6 @@ def calc_rmsz(o_files,var_name3d,var_name2d,is_SE,opts_dict):
       temp1,temp2,area_wgt,z_wgt=get_area_wgt(o_files,is_SE,input_dims,nlev,popens)
       gm3d = np.zeros((len(var_name3d)),dtype=np.float32)
       gm2d = np.zeros((len(var_name2d)),dtype=np.float32)
-
-    #lOOP THROUGH 3D  
     for vcount,vname in enumerate(var_name3d):
       #Read in vname's data of all files
       for fcount, this_file in enumerate(o_files):
@@ -105,11 +102,11 @@ def calc_rmsz(o_files,var_name3d,var_name2d,is_SE,opts_dict):
           output3d[fcount,:,:,:]=data[tslice,:,:,:]
 
       #Generate ens_avg and ens_stddev to store in the ensemble summary file
-      if popens:#POP
+      if popens:
          moutput3d=np.ma.masked_values(output3d,data._FillValue)
          ens_avg3d[vcount]=np.ma.average(moutput3d,axis=0)
          ens_stddev3d[vcount]=np.ma.std(moutput3d,axis=0,dtype=np.float32)
-      else: #CAM
+      else:
          ens_avg3d[vcount]=np.average(output3d,axis=0).astype(np.float32)
          ens_stddev3d[vcount]=np.std(output3d.astype(np.float64),axis=0,dtype=np.float64).astype(np.float32)
          if cumul:
@@ -134,8 +131,7 @@ def calc_rmsz(o_files,var_name3d,var_name2d,is_SE,opts_dict):
                 Zscore3d[vcount,fcount]=np.sqrt(Zscore/(npts3d-count3d))
               else:
                 print "WARNING: no variance in "+vname
-           else: #POP
-              #rmask contains a number for each grid point indicating it's region 
+           else:
               rmask=this_file.variables['REGION_MASK']
               Zscore=pop_zpdf(output3d[fcount],nbin,(minrange,maxrange),ens_avg3d[vcount],ens_stddev3d[vcount],data._FillValue,threshold,rmask,opts_dict)
               #if fcount == 0 & vcount ==0:
@@ -146,7 +142,6 @@ def calc_rmsz(o_files,var_name3d,var_name2d,is_SE,opts_dict):
               Zscore3d[vcount,fcount,:]=Zscore[:]
               #print 'zscore3d vcount,fcount=',vcount,fcount,Zscore3d[vcount,fcount]
 
-    #LOOP THROUGH 2D
     for vcount,vname in enumerate(var_name2d):
       #Read in vname's data of all files
       for fcount, this_file in enumerate(o_files):
@@ -158,11 +153,11 @@ def calc_rmsz(o_files,var_name3d,var_name2d,is_SE,opts_dict):
           output2d[fcount,:,:]=data[tslice,:,:]
 
       #Generate ens_avg and esn_stddev to store in the ensemble summary file
-      if popens: #POP
+      if popens:
          moutput2d=np.ma.masked_values(output2d,data._FillValue)
          ens_avg2d[vcount]=np.ma.average(moutput2d,axis=0)
          ens_stddev2d[vcount]=np.ma.std(moutput2d,axis=0,dtype=np.float32)
-      else:#CAM
+      else:
          ens_avg2d[vcount]=np.average(output2d,axis=0).astype(np.float32)
          ens_stddev2d[vcount]=np.std(output2d,axis=0,dtype=np.float64).astype(np.float32)
          if cumul:
@@ -188,10 +183,11 @@ def calc_rmsz(o_files,var_name3d,var_name2d,is_SE,opts_dict):
                 Zscore2d[vcount,fcount]=np.sqrt(Zscore/(npts2d-count2d))
               else:
                 print "WARNING: no variance in "+vname
-           else:#POP
+           else:
               rmask=this_file.variables['REGION_MASK']
               Zscore=pop_zpdf(output2d[fcount],nbin,(minrange,maxrange),ens_avg2d[vcount],ens_stddev2d[vcount],data._FillValue,threshold,rmask,opts_dict)
               Zscore2d[vcount,fcount,:]=Zscore[:]
+              #print 'zscore2d vcount,fcount=',vcount,fcount,Zscore2d[vcount,fcount]
      
     return Zscore3d,Zscore2d,ens_avg3d,ens_stddev3d,ens_avg2d,ens_stddev2d,gm3d,gm2d
 
@@ -204,8 +200,9 @@ def pop_zpdf(input_array,nbin,zrange,ens_avg,ens_stddev,FillValue,threshold,rmas
       test_failure=opts_dict['test_failure']
    else:
       test_failure=False 
-   #Masked out the missing values (land)
+   #Masked the missing value
    moutput=np.ma.masked_values(input_array,FillValue)
+   #print 'before count=',moutput.count()
    if input_array.ndim==3:
       rmask3d=np.zeros(input_array.shape,dtype=np.int32)
       for i in rmask3d:
@@ -215,10 +212,9 @@ def pop_zpdf(input_array,nbin,zrange,ens_avg,ens_stddev,FillValue,threshold,rmas
       rmask_array=np.zeros(input_array.shape,dtype=np.int32)
       rmask_array[:,:]=rmask[:,:]
 
-   #Now we just want the open oceans (not marginal seas)
-   # - so for g1xv7, those are 1,2,3,4,6
-   # in the region mask - so we don't want rmask<1 or rmask>6
+   #Masked the rmask<1 or rmask>6
    moutput2=np.ma.masked_where((rmask_array<1)|(rmask_array>6),moutput)
+   #print 'moutput2 count=',moutput2.count()
 
    #Use the masked array moutput2 to calculate Zscore_temp=(data-avg)/stddev
    Zscore_temp=np.fabs((moutput2.astype(np.float64)-ens_avg)/np.where(ens_stddev<=threshold,FillValue,ens_stddev))
@@ -226,7 +222,7 @@ def pop_zpdf(input_array,nbin,zrange,ens_avg,ens_stddev,FillValue,threshold,rmas
    #To retrieve only the valid entries of Zscore_temp
    Zscore_nomask=Zscore_temp[~Zscore_temp.mask]
 
-   #If just test failure, calculate ZPR only (DEFAULT - not chnagable via cmd line
+   #If just test failure, calculate ZPR only
    if test_failure:
       #Zpr=the count of Zscore_nomask is less than pop_tol (3.0)/ the total count of Zscore_nomask  
       Zpr=np.where(Zscore_nomask<=opts_dict['pop_tol'])[0].size/float(Zscore_temp.count())
@@ -235,12 +231,13 @@ def pop_zpdf(input_array,nbin,zrange,ens_avg,ens_stddev,FillValue,threshold,rmas
    #Else calculate zpdf and return as zscore
    #Count the unmasked value
    count=Zscore_temp.count()
-
+   #print 'Zscore count=',count
    Zscore,bins = np.histogram(Zscore_temp.compressed(),bins=nbin,range=zrange)
 
    #Normalize the number by dividing the count
    if count != 0:
       Zscore=Zscore.astype(np.float32)/count
+      print 'sum=',np.sum(Zscore)
    else:
       print 'count=0,sum=',np.sum(Zscore)
    return Zscore
@@ -254,11 +251,11 @@ def calculate_raw_score(k,v,npts3d,npts2d,ens_avg,ens_stddev,is_SE,opts_dict,Fil
   threshold = 1.0e-12
   has_zscore=True
   popens=opts_dict['popens']
-  if popens: #POP
+  if popens:
       minrange=opts_dict['minrange'] 
       maxrange=opts_dict['maxrange'] 
       Zscore=pop_zpdf(v,opts_dict['nbin'],(minrange,maxrange),ens_avg,ens_stddev,FillValue,threshold,rmask,opts_dict)
-  else: #CAM
+  else:
       if k in ens_avg:
         if is_SE:
             if ens_avg[k].ndim == 1:
@@ -318,12 +315,12 @@ def search_sumfile(opts_dict,ifiles):
        if 'testtype' in global_att:
              sumfile_dir=sumfile_dir+'/'+testtype+'/'
        else:
-           print "ERROR: No global attribute testtype in your validation file."
+           print "Error: No global attribute testtype in your validation file. EXITING"
            sys.exit(2)
        if 'model_version' in global_att:
            sumfile_dir=sumfile_dir+'/'+model_version+'/'
        else:
-           print "ERROR: No global attribute model_version in your validation file."
+           print "Error: No global attribute model_version in your validation file. EXITING"
            sys.exit(2)
        if (os.path.exists(sumfile_dir)):
            thefile_id=0
@@ -332,18 +329,18 @@ def search_sumfile(opts_dict,ifiles):
                   sumfile_id=Nio.open_file(sumfile_dir+i,'r')
                   sumfile_gatt=sumfile_id.attributes
                   if 'grid' not in sumfile_gatt and 'resolution' not in sumfile_gatt:
-                     print "ERROR: No global attribute grid or resolution in the summary file."
+                     print "Error: No global attribute grid or resolution in the summary file. EXITING"
                      sys.exit(2)
                   if 'compset' not in sumfile_gatt:
-                     print "ERROR: No global attribute compset in the summary file"
+                     print "Error: No global attribute compset in the summary file. EXITING"
                      sys.exit(2)
                   if sumfile_gatt['resolution']==grid and sumfile_gatt['compset']==compset:
                      thefile_id=sumfile_id
            if thefile_id==0:
-              print "ERROR: The validation files don't have matching ensemble summary file to compare."
+              print "Error: The validation files don't have matching ensemble summary file to compare. EXITING"
               sys.exit(2)    
        else:
-         print "ERROR: Could not locate directory "+sumfile_dir
+         print "Error:Could not locate directory "+sumfile_dir+" EXITING"
          sys.exit(2)
        return sumfile_dir+i,machineid,compiler
 
@@ -407,7 +404,7 @@ def pre_PCA(gm_32,all_var_names,whole_list,me):
     if me.get_rank() == 0:
         print "standardized_global_mean rank = ",standardized_rank 
         print "checking for dependent vars using QR..."
-
+    #dep_var_list=get_failure_index(standardized_global_mean)
     dep_var_list = get_dependent_vars_index(standardized_global_mean, standardized_rank)
     num_dep = len(dep_var_list)
     orig_len = len(whole_list)
@@ -646,23 +643,18 @@ def generate_global_mean_for_summary(o_files,var_name3d,var_name2d,is_SE,pepsi_g
 
   
     var_list=[] 
-    #Remove this: some valid CAM vars are all small entries(e.g. DTWR_H2O2 and DTWR_H2O4)
-    #for i in range(len(var_name3d)):
-    #    if not np.any(np.abs(gm3d[i]) >= 1.0e-15): 
-    #       var_list.append(var_name3d[i])
-    #for i in range(len(var_name2d)):
-    #    if not np.any(np.abs(gm2d[i]) >= 1.0e-15): 
-    #       var_list.append(var_name2d[i])
-
+    for i in range(len(var_name3d)):
+        if not np.any(np.abs(gm3d[i]) >= 1.0e-15): 
+           var_list.append(var_name3d[i])
+    for i in range(len(var_name2d)):
+        if not np.any(np.abs(gm2d[i]) >= 1.0e-15): 
+           var_list.append(var_name2d[i])
     return gm3d,gm2d,var_list
 
 #
 # Calculate global means for one OCN input file
 #
 def calc_global_mean_for_onefile_pop(fname, area_wgt,z_wgt,var_name3d, var_name2d,output3d,output2d, tslice, is_SE, nlev,opts_dict):
-    
-    nan_flag = False
-
     n3d = len(var_name3d)
     n2d = len(var_name2d)
 
@@ -675,9 +667,6 @@ def calc_global_mean_for_onefile_pop(fname, area_wgt,z_wgt,var_name3d, var_name2
         #    print "calculating GM for variable ", vname
         gm_lev = np.zeros(nlev)
         data = fname.variables[vname]
-        if np.any(np.isnan(data)):
-            print "ERROR: "+vname+ " data contains NaNs - please check input."
-            nan_flag = True
         output3d[:,:,:] = data[tslice,:,:,:] 
         for k in range(nlev):
             moutput3d=np.ma.masked_values(output3d[k,:,:],data._FillValue)
@@ -690,19 +679,10 @@ def calc_global_mean_for_onefile_pop(fname, area_wgt,z_wgt,var_name3d, var_name2
         #if (verbose == True):
         #    print "calculating GM for variable ", vname
         data = fname.variables[vname]
-        if np.any(np.isnan(data)):
-            print "ERROR: "+vname+ " data contains NaNs - please check input."
-            nan_flag = True
         output2d[:,:] = data[tslice,:,:] 
         moutput2d=np.ma.masked_values(output2d[:,:],data._FillValue)
         gm2d_mean = pop_area_avg(moutput2d, area_wgt)
         gm2d[count]=gm2d_mean
- 
-
-    if nan_flag:
-        print "EXITING due to Nans in input data!!!"
-        sys.exit()
-
     return gm3d,gm2d        
 
 #
@@ -710,9 +690,6 @@ def calc_global_mean_for_onefile_pop(fname, area_wgt,z_wgt,var_name3d, var_name2
 #
 def calc_global_mean_for_onefile(fname, area_wgt,var_name3d, var_name2d,output3d,output2d, tslice, is_SE, nlev,opts_dict):
     
-
-    nan_flag = False
-
     if 'cumul' in opts_dict:
        cumul = opts_dict['cumul']
     else:
@@ -728,16 +705,13 @@ def calc_global_mean_for_onefile(fname, area_wgt,var_name3d, var_name2d,output3d
         #if (verbose == True):
         #    print "calculating GM for variable ", vname
         if vname not in fname.variables:
-           print 'Warning: the test file does not have the variable '+vname+' that isin the ensemble summary file ...'
+           print 'Error: the testing file does not have the variable '+vname+' that in the ensemble summary file'
            continue
         data = fname.variables[vname]
         if not data[tslice].size:
-           print "ERROR: " +vname+" data is empty"
+           print vname+" data is empty"
            sys.exit(2)
-        if np.any(np.isnan(data)):
-            print "ERROR: "+vname+ " data contains NaNs - please check input."
-            nan_flag = True
-            continue
+
         if (is_SE == True):
             if not cumul: 
                temp=data[tslice].shape[0]
@@ -768,13 +742,9 @@ def calc_global_mean_for_onefile(fname, area_wgt,var_name3d, var_name2d,output3d
         #if (verbose == True):
         #    print "calculating GM for variable ", vname
         if vname not in fname.variables:
-           print 'Warning: the test file does not have the variable '+vname+' that is in the ensemble summary file'
+           print 'Error: the testing file does not have the variable '+vname+' that in the ensemble summary file'
            continue
         data = fname.variables[vname]
-        if np.any(np.isnan(data)):
-            print "ERROR: "+vname+ " data contains NaNs - please check input."
-            nan_flag = True
-            continue
         if (is_SE == True):
             if not cumul:
                 output2d[:] = data[tslice,:] 
@@ -785,10 +755,6 @@ def calc_global_mean_for_onefile(fname, area_wgt,var_name3d, var_name2d,output3d
             gm2d_mean = area_avg(output2d[:,:], area_wgt, is_SE)
         gm2d[count]=gm2d_mean
 
-    if nan_flag:
-        print "EXITING due to Nans in input data!!!"
-        sys.exit()
-
     return gm3d,gm2d        
 
 #
@@ -798,7 +764,7 @@ def read_ensemble_summary(ens_file):
   if(os.path.isfile(ens_file)):
      fens = Nio.open_file(ens_file,"r")
   else:
-     print 'ERROR: file ens summary: ',ens_file,' Not found'
+     print 'file ens summary: ',ens_file,' Not found'
      sys.exit(2)
 
   is_SE = False
@@ -916,6 +882,9 @@ def get_ncol_nlev(frun):
     one_spatial_dim = False
   else:
     one_spatial_dim = True
+  #if nlev == -1 or ncol == -1:
+  #  print "Error: cannot find ncol or nlev dimension in "+run_file
+  #  sys.exit(2) 
 
   if one_spatial_dim:
     npts3d=float(nlev*ncol)
@@ -946,7 +915,7 @@ def calculate_maxnormens(opts_dict,var_list):
     if (os.path.isfile(inputdir+frun_file)):
       ifiles.append(Nio.open_file(inputdir+frun_file,"r"))
     else:
-      print "ERROR: COULD NOT LOCATE FILE "+inputdir+frun_file
+      print "COULD NOT LOCATE FILE "+inputdir+frun_file+" EXISTING"
       sys.exit() 
   comparision={}
   # loop through each variable
@@ -1283,7 +1252,6 @@ def CECT_usage():
     print '   --verbose               : prints out in verbose mode (off by default)'
     print '   --sumfile  <ifile>      : the ensemble summary file (generated by pyEnsSum.py)'
     print '   --indir    <path>       : directory containing the input run files (at least 3 files)'
-    print '   --tslice   <num>        : which time slice to use from input run files (default = 1)'
     print '  ----------------------------'
     print '   Args for CAM-CECT and UF-CAM-ECT:'
     print '  ----------------------------'
@@ -1292,19 +1260,19 @@ def CECT_usage():
     print '   --minPCFail <num>       : minimum number of PCs that must fail the specified number of runs for a FAILURE (default = 3)'
     print '   --minRunFail <num>      : minimum number of runs that <minPCfail> PCs must fail for a FAILURE (default = 2)'
     print '   --numRunFile <num>      : total number of runs to include in test (default = 3)'
+    print '   --tslice <num>          : which time slice to use from input run files (default = 1)'
     print '   --printVarTest          : print out variable comparisons to RMSZ and global means (off by default)'
     print '   --prn_std_mean          : enable printing out sum of standardized mean of all variables in decreasing order and associated box plots (off by default) - requires Python seaborn package'
     print '   --eet <num>             : enable Ensemble Exhaustive Test (EET) to compute failure percent of <num> runs (greater than or equal to numRunFile)'
     print '  ----------------------------'
     print '   Args for POP-CECT :'
     print '  ----------------------------'
-    print '   --popens                : indicate POP-ECT (required!) (tslice will bet set to 0)'
-    print '   --jsonfile  <file>      : list the json file that specifies variables to test (required!), e.g. pop_ensemble.json' 
-#    print '   --mpi_enable            : enable parallel mode (Generally not needed)'
-    print '   --pop_tol <num>         : set pop zscore tolerance (default is 3.0 - recommended)'
-    print '   --pop_threshold <num>   : set pop threshold (default is 0.9)'
-    print '   --input_globs <search pattern> : set the search pattern (wildcard) for the file(s) to compare from '
-    print '                           the input directory (indir), such as core48.pop.h.0003-12 or core48.pop.h.0003 (more info in README)'
+    print '   --popens                : enable pop ensemble option (in this case, tslice likely needs to be 0)'
+    print '   --mpi_enable            : enable parallel mode, recommend one core per month'
+    print '   --pop_tol <num>         : set pop zscore tolerance, default is 3.0'
+    print '   --pop_threshold <num>   : set pop threshold, default is 0.9'
+    print '   --input_globs <search pattern> : set the search pattern of the testcase file to get from '
+    print '                           the input directory (indir), such as core48.pop.h.0003-12 or core48.pop.h.0003'
     print 'Version 3.0.7'
 
 #
@@ -1350,19 +1318,18 @@ def EnsSumPop_usage():
     print '   --sumfile    <ofile> : the output summary data file (default = ens.summary.nc)'
     print '   --tslice <num>       : the time slice of the variable that we will use (default = 0)'
     print '   --indir      <path>  : directory containing all of the ensemble runs (default = ./)'
-    print '   --nyear  <num>       : Number of years (default = 1)'
-    print '   --nmonth  <num>      : Number of months (default = 12)'
+    print '   --nyear  <num>       : Number of year (default = 3)'
+    print '   --nmonth  <num>      : Number of month (default = 12)'
     print '   --npert <num>        : Number of ensemble members (default = 40)'
-    print '   --tag <name>         : Tag name used in metadata (default = cesm2_0_0)'
-    print '   --compset <name>     : Compset used in metadata (default = G)'
-    print '   --res <name>         : Resolution (used in metadata), (default = T62_g17)'
+    print '   --tag <name>         : Tag name used in metadata (default = cesm1_2_2)'
+    print '   --compset <name>     : Compset used in metadata (default = G_NORMAL_YEAR)'
+    print '   --res <name>         : Resolution (used in metadata), (default = T62_t12)'
     print '   --mach <num>         : Machine name used in the metadata, (default = cheyenne)'
     print '   --jsonfile <fname>   : Jsonfile to provide that a list of variables that will be included  (no default)'
     print '   --mpi_enable         : Enable mpi mode (off by default)'
-#    print '   --zscoreonly         : Only generate zscores and omit global means (recommended:faster, and global means are not needed for POP-ECT)'
+    print '   --zscoreonly         : Only generate zscore, omit global_mean'
     print '   '
-
-
+    print 'Version 1.0.0'
 #
 # Random pick up three files out of a lot files
 #
@@ -1468,6 +1435,8 @@ def get_stride_list(len_of_list,me):
 #
 def gather_npArray_pop(npArray,me,array_shape):
     the_array=np.zeros(array_shape,dtype=np.float32)
+    #print "array_shape=",array_shape
+    #print "len array_shape=",len(array_shape)
      
     if me.get_rank()==0:
         j=me.get_rank()
@@ -1504,26 +1473,27 @@ def gather_npArray_pop(npArray,me,array_shape):
 # Use input files from opts_dict['input_globs'] to get timeslices for pop ensemble
 #
 def get_files_from_glob(opts_dict):
+    if opts_dict['input_globs']:
        in_files=[]
-       wildname='*'+str(opts_dict['input_globs'])+'*'
+       wildname='*'+opts_dict['input_globs']+'*'
        if (os.path.exists(opts_dict['indir'])):
           full_glob_str=os.path.join(opts_dict['indir'],wildname)
           glob_files=glob.glob(full_glob_str)
           in_files.extend(glob_files)
           in_files.sort()
        else:
-          print 'ERROR: Input directory does not exist'
+          print 'Wrong input directory'
           sys.exit()
        n_timeslice=[]
        for fname in in_files:
            istr=fname.find('.nc')
            temp=(int(fname[istr-7:istr-3])-1)*12+int(fname[istr-2:istr])-1
            n_timeslice.append(temp)
-       return n_timeslice, in_files
+       return n_timeslice
 #
-#POP-ECT Compare the testcase with the ensemble summary file 
+#Compare the testcase with the ensemble summary file to get a PCA score 
 #
-def pop_compare_raw_score(opts_dict,ifiles,timeslice,Var3d,Var2d):
+def compare_raw_score(opts_dict,ifiles,timeslice,Var3d,Var2d):
     rmask_var = 'REGION_MASK'
     if not opts_dict['test_failure']:
        nbin=opts_dict['nbin']
@@ -1542,51 +1512,19 @@ def pop_compare_raw_score(opts_dict,ifiles,timeslice,Var3d,Var2d):
            ens_stddev3d=v
         elif k == 'ens_avg3d':
            ens_avg3d = v
-        elif k == 'time':
-            ens_time = v
-        
-
-    #check time slice 0 for zeros....indicating an incomplete summary file
-    sum_problem = False
-    all_zeros = not np.any(ens_stddev2d[0,:,:])
-    if all_zeros:
-        print 'ERROR: ens_stddev2d field in summary file was not computed.' 
-        sum_problem = True
-
-    all_zeros = not np.any(ens_avg2d[0,:,:])
-    if all_zeros:
-        print 'ERROR: ens_avg2d field in summary file was not computed.' 
-        sum_problem = True
-
-    all_zeros = not np.any(ens_stddev3d[0,:,:,:])
-    if all_zeros:
-        print 'ERROR: ens_stddev3d field in summary file was not computed.' 
-        sum_problem = True
-
-    all_zeros = not np.any(ens_avg3d[0,:,:,:])
-    if all_zeros:
-        print 'ERROR: ens_avg3d field in summary file was not computed.' 
-        sum_problem = True
-
-    if sum_problem:
-        print 'Exiting....'
-        sys.exit()
 
     npts3d=0
     npts2d=0
     is_SE=False
-    ens_timeslice = len(ens_time)
-
-    #Get the exact month from the file names 
+  
+    #Get the exactly month from the file names 
     n_timeslice=[] 
-    in_file_names = []
     if not opts_dict['mpi_enable']:
-       n_timeslice, in_file_names=get_files_from_glob(opts_dict)
-       #print in_file_names
+       n_timeslice=get_files_from_glob(opts_dict)
        temp_list=[]
        for i in n_timeslice:
            temp_list.append(i+1)
-       print 'Checkpoint month(s) = ',temp_list
+       print 'Checkpoint month = ',temp_list
 
     #Compare an individual file with ensemble summary file to get zscore 
     for fcount,fid in enumerate(ifiles): 
@@ -1594,15 +1532,10 @@ def pop_compare_raw_score(opts_dict,ifiles,timeslice,Var3d,Var2d):
         #If not in mpi_enable mode, the timeslice will be decided by the month of the input files
         if not opts_dict['mpi_enable']:
            timeslice=n_timeslice[fcount]
-
+        #print 'case number= ', fcount
         otimeSeries = fid.variables 
         rmask=otimeSeries[rmask_var]
-
-        print '**********'+'Run '+str(fcount+1)+" (file=" + in_file_names[fcount]+ "):"
-  
-        if timeslice >= ens_timeslice:
-            print 'WARNING: The summary file containing only ',ens_timeslice, ' timeslices. Skipping this run evaluation...'
-            continue
+        print '**********'+'Run '+str(fcount+1)+":"
         for vcount,var_name in enumerate(Var3d): 
             orig=otimeSeries[var_name][0]
             FillValue=otimeSeries[var_name]._FillValue
@@ -1623,7 +1556,6 @@ def pop_compare_raw_score(opts_dict,ifiles,timeslice,Var3d,Var2d):
                print '          '+ '{:>10}'.format(var_name)+": "+'{:.2%}'.format(temp)
                if Zscore[vcount+len(Var3d),fcount,:]< opts_dict['pop_threshold']:
                   failure_count[fcount]=failure_count[fcount]+1
-
 
         if failure_count[fcount]>0:
            print '**********'+str(failure_count[fcount])+' of '+str(len(Var3d)+len(Var2d)) +' variables failed, resulting in an overall FAIL'+'**********'
@@ -1660,7 +1592,7 @@ def get_failure_index(the_array):
                 deficit_row.append(x)
              else:
                 deficit_row.append(i)
-
+                #print "first deficit_row=",deficit_row
              the_array=temp_mat
              mat_rows=the_array.shape[0]
              mat_rank=new_rank
@@ -1750,15 +1682,15 @@ def plot_variable(in_files_list,comp_file,opts_dict,var_list,run_index,me):
            ens_arr=ensfile.variables[i][1]
            
         else:
-           print "ERROR:" + i +" is not in ensemble files"
+           print i+" is not in ensemble files"
            sys.exit()
         if i in runfile.variables:
            data_arr=runfile.variables[i][1]
         else:
-           print "ERROR: "+i+" is not in run files"
+           print i+" is not in run files"
            sys.exit()
         if ens_arr.size != data_arr.size:
-           print "ERROR: ensemble file does not have the same shape as the run file!"
+           print "Error: ensemble file dose not have the same shape as the run file!"
            sys.exit()
         long_name=runfile.variables[i].long_name
         the_units=runfile.variables[i].units

@@ -179,7 +179,7 @@ class SystemTestsCompareTwoFake(SystemTestsCompareTwo):
         if caseroot not in self.run_pass_caseroot:
             raise RuntimeError('caseroot not in run_pass_caseroot')
 
-    def _do_compare_test(self, suffix1, suffix2, ignore_fieldlist_diffs=False):
+    def _do_compare_test(self, suffix1, suffix2):
         """
         This fake implementation allows controlling whether compare_test
         passes or fails
@@ -496,10 +496,7 @@ class TestSystemTestsCompareTwo(unittest.TestCase):
                                            run_one_should_pass = False)
 
         # Exercise
-        try:
-            mytest.run()
-        except Exception:
-            pass
+        mytest.run()
 
         # Verify
         self.assertEqual(test_status.TEST_FAIL_STATUS,
@@ -515,10 +512,7 @@ class TestSystemTestsCompareTwo(unittest.TestCase):
                                            run_two_should_pass = False)
 
         # Exercise
-        try:
-            mytest.run()
-        except Exception:
-            pass
+        mytest.run()
 
         # Verify
         self.assertEqual(test_status.TEST_FAIL_STATUS,

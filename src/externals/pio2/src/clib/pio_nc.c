@@ -19,54 +19,7 @@
 #include <pio_internal.h>
 
 /**
- * @defgroup PIO_inq_c Learn About File
- * Learn the number of variables, dimensions, and global atts, and the
- * unlimited dimension in C.
- *
- * @defgroup PIO_typelen_c Learn Aboue a Data Type
- * Learn the length of a data type in C.
- *
- * @defgroup PIO_inq_format_c Learn About Binary Format
- * Learn about the binary format in C.
- *
- * @defgroup PIO_inq_dim_c Learn About a Dimension
- * Learn dimension name and length in C.
- *
- * @defgroup PIO_inq_var_c Learn About a Variable
- * Learn variable name, dimensions, and type in C.
- *
- * @defgroup PIO_inq_att_c Learn About an Attribute
- * Learn length, type, and name of an attribute in C.
- *
- * @defgroup PIO_rename_dim_c Rename a Dimension
- * Rename a dimension in C.
- *
- * @defgroup PIO_rename_var_c Rename a Variable
- * Rename a variable in C.
- *
- * @defgroup PIO_rename_att_c Rename an Attribute
- * Rename an attribute in C.
- *
- * @defgroup PIO_del_att_c Delete an Attribute
- * Delete an attribute in C.
- *
- * @defgroup PIO_set_fill_c Set Fill Value
- * Set the fill value for a variable in C.
- *
- * @defgroup PIO_enddef_c End Define Mode
- * End define mode in C.
- *
- * @defgroup PIO_redef_c Re-enter Define Mode
- * Re-enter Define Mode in C.
- *
- * @defgroup PIO_def_dim_c Define a Dimension
- * Define a new dimension in the file in C.
- *
- * @defgroup PIO_def_var_c Define a Variable
- * Define a new variable in the file in C.
- */
-
-/**
+ * @ingroup PIO_inq
  * The PIO-C interface for the NetCDF function nc_inq.
  *
  * This routine is called collectively by all tasks in the
@@ -77,30 +30,19 @@
  *
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
- * @param ndimsp a pointer that will get the number of
- * dimensions. Ignored if NULL.
- * @param nvarsp a pointer that will get the number of
- * variables. Ignored if NULL.
- * @param ngattsp a pointer that will get the number of
- * attributes. Ignored if NULL.
- * @param unlimdimidp a pointer that will the ID of the unlimited
- * dimension, or -1 if there is no unlimited dimension. Ignored if
- * NULL.
  *
  * @return PIO_NOERR for success, error code otherwise. See
- * PIOc_Set_File_Error_Handling().
- * @ingroup PIO_inq_c
+ * PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
+int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int ierr;              /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function calls. */
 
-    PLOG((1, "PIOc_inq ncid = %d", ncid));
+    LOG((1, "PIOc_inq ncid = %d", ncid));
 
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -131,15 +73,15 @@ PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
                 mpierr = MPI_Bcast(&ngatts_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
             if (!mpierr)
                 mpierr = MPI_Bcast(&unlimdimid_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            PLOG((2, "PIOc_inq ncid = %d ndims_present = %d nvars_present = %d ngatts_present = %d unlimdimid_present = %d",
-                  ncid, ndims_present, nvars_present, ngatts_present, unlimdimid_present));
+            LOG((2, "PIOc_inq ncid = %d ndims_present = %d nvars_present = %d ngatts_present = %d unlimdimid_present = %d",
+                 ncid, ndims_present, nvars_present, ngatts_present, unlimdimid_present));
         }
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            return check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -150,21 +92,21 @@ PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
         {
             ierr = ncmpi_inq(file->fh, ndimsp, nvarsp, ngattsp, unlimdimidp);
             if (unlimdimidp)
-                PLOG((2, "PIOc_inq returned from ncmpi_inq unlimdimid = %d", *unlimdimidp));
+                LOG((2, "PIOc_inq returned from ncmpi_inq unlimdimid = %d", *unlimdimidp));
         }
 #endif /* _PNETCDF */
         if (file->iotype == PIO_IOTYPE_NETCDF && file->do_io)
         {
-            PLOG((2, "PIOc_inq calling classic nc_inq"));
+            LOG((2, "PIOc_inq calling classic nc_inq"));
             /* Should not be necessary to do this - nc_inq should
              * handle null pointers. This has been reported as a bug
              * to netCDF developers. */
             int tmp_ndims, tmp_nvars, tmp_ngatts, tmp_unlimdimid;
-            PLOG((2, "PIOc_inq calling classic nc_inq"));
+            LOG((2, "PIOc_inq calling classic nc_inq"));
             ierr = nc_inq(file->fh, &tmp_ndims, &tmp_nvars, &tmp_ngatts, &tmp_unlimdimid);
-            PLOG((2, "PIOc_inq calling classic nc_inq"));
+            LOG((2, "PIOc_inq calling classic nc_inq"));
             if (unlimdimidp)
-                PLOG((2, "classic tmp_unlimdimid = %d", tmp_unlimdimid));
+                LOG((2, "classic tmp_unlimdimid = %d", tmp_unlimdimid));
             if (ndimsp)
                 *ndimsp = tmp_ndims;
             if (nvarsp)
@@ -174,104 +116,99 @@ PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
             if (unlimdimidp)
                 *unlimdimidp = tmp_unlimdimid;
             if (unlimdimidp)
-                PLOG((2, "classic unlimdimid = %d", *unlimdimidp));
+                LOG((2, "classic unlimdimid = %d", *unlimdimidp));
         }
         else if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
         {
-            PLOG((2, "PIOc_inq calling netcdf-4 nc_inq"));
+            LOG((2, "PIOc_inq calling netcdf-4 nc_inq"));
             ierr = nc_inq(file->fh, ndimsp, nvarsp, ngattsp, unlimdimidp);
         }
 
-        PLOG((2, "PIOc_inq netcdf call returned %d", ierr));
+        LOG((2, "PIOc_inq netcdf call returned %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (ndimsp)
         if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     if (nvarsp)
         if ((mpierr = MPI_Bcast(nvarsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     if (ngattsp)
         if ((mpierr = MPI_Bcast(ngattsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     if (unlimdimidp)
         if ((mpierr = MPI_Bcast(unlimdimidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_inq_ndims
  * Find out how many dimensions are defined in the file.
  *
  * @param ncid the ncid of the open file.
- * @param ndimsp a pointer that will get the number of
- * dimensions. Ignored if NULL.
+ * @param ndimsp a pointer that will get the number of dimensions.
  * @returns 0 for success, error code otherwise.
- * @ingroup PIO_inq_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_ndims(int ncid, int *ndimsp)
+int PIOc_inq_ndims(int ncid, int *ndimsp)
 {
-    PLOG((1, "PIOc_inq_ndims"));
+    LOG((1, "PIOc_inq_ndims"));
     return PIOc_inq(ncid, ndimsp, NULL, NULL, NULL);
 }
 
 /**
+ * @ingroup PIO_inq_nvars
  * Find out how many variables are defined in a file.
  *
  * @param ncid the ncid of the open file.
  * @param nvarsp a pointer that will get the number of variables.
  * @returns 0 for success, error code otherwise.
- * @ingroup PIO_inq_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_nvars(int ncid, int *nvarsp)
+int PIOc_inq_nvars(int ncid, int *nvarsp)
 {
     return PIOc_inq(ncid, NULL, nvarsp, NULL, NULL);
 }
 
 /**
+ * @ingroup PIO_inq_natts
  * Find out how many global attributes are defined in a file.
  *
  * @param ncid the ncid of the open file.
- * @param ngattsp a pointer that will get the number of attributes.
+ * @param nattsp a pointer that will get the number of attributes.
  * @returns 0 for success, error code otherwise.
- * @ingroup PIO_inq_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_natts(int ncid, int *ngattsp)
+int PIOc_inq_natts(int ncid, int *ngattsp)
 {
     return PIOc_inq(ncid, NULL, NULL, ngattsp, NULL);
 }
 
 /**
+ * @ingroup PIO_inq_unlimdim
  * Find out the dimension ids of the unlimited dimension.
  *
  * @param ncid the ncid of the open file.
  * @param unlimdimidp a pointer that will the ID of the unlimited
  * dimension, or -1 if there is no unlimited dimension.
  * @returns 0 for success, error code otherwise.
- * @ingroup PIO_inq_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_unlimdim(int ncid, int *unlimdimidp)
+int PIOc_inq_unlimdim(int ncid, int *unlimdimidp)
 {
-    PLOG((1, "PIOc_inq_unlimdim ncid = %d", ncid));
+    LOG((1, "PIOc_inq_unlimdim ncid = %d", ncid));
     return PIOc_inq(ncid, NULL, NULL, NULL, unlimdimidp);
 }
 
@@ -285,11 +222,10 @@ PIOc_inq_unlimdim(int ncid, int *unlimdimidp)
  * @param unlimdimidsp a pointer that will get an array of unlimited
  * dimension IDs.
  * @returns 0 for success, error code otherwise.
- * @ingroup PIO_inq_unlimdim_c
+ * @ingroup PIO_inq_unlimdim
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
+int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -297,7 +233,7 @@ PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
     int ierr;              /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function calls. */
 
-    PLOG((1, "PIOc_inq_unlimdims ncid = %d", ncid));
+    LOG((1, "PIOc_inq_unlimdims ncid = %d", ncid));
 
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -322,27 +258,27 @@ PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
                 mpierr = MPI_Bcast(&nunlimdimsp_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
             if (!mpierr)
                 mpierr = MPI_Bcast(&unlimdimidsp_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            PLOG((2, "PIOc_inq_unlimdims ncid = %d nunlimdimsp_present = %d unlimdimidsp_present = %d",
-                  ncid, nunlimdimsp_present, unlimdimidsp_present));
+            LOG((2, "PIOc_inq_unlimdims ncid = %d nunlimdimsp_present = %d unlimdimidsp_present = %d",
+                 ncid, nunlimdimsp_present, unlimdimidsp_present));
         }
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            return check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
-    PLOG((2, "file->iotype = %d", file->iotype));
+    LOG((2, "file->iotype = %d", file->iotype));
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
         if (file->iotype == PIO_IOTYPE_NETCDF && file->do_io)
         {
-            PLOG((2, "netcdf"));
+            LOG((2, "netcdf"));
             int tmp_unlimdimid;
             ierr = nc_inq_unlimdim(file->fh, &tmp_unlimdimid);
-            PLOG((2, "classic tmp_unlimdimid = %d", tmp_unlimdimid));
+            LOG((2, "classic tmp_unlimdimid = %d", tmp_unlimdimid));
             tmp_nunlimdims = tmp_unlimdimid >= 0 ? 1 : 0;
             if (nunlimdimsp)
                 *nunlimdimsp = tmp_unlimdimid >= 0 ? 1 : 0;
@@ -352,10 +288,10 @@ PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
 #ifdef _PNETCDF
         else if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
-            PLOG((2, "pnetcdf"));
+            LOG((2, "pnetcdf"));
             int tmp_unlimdimid;
             ierr = ncmpi_inq_unlimdim(file->fh, &tmp_unlimdimid);
-            PLOG((2, "pnetcdf tmp_unlimdimid = %d", tmp_unlimdimid));
+            LOG((2, "pnetcdf tmp_unlimdimid = %d", tmp_unlimdimid));
             tmp_nunlimdims = tmp_unlimdimid >= 0 ? 1 : 0;
             if (nunlimdimsp)
                 *nunlimdimsp = tmp_nunlimdims;
@@ -367,14 +303,14 @@ PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
         else if ((file->iotype == PIO_IOTYPE_NETCDF4C || file->iotype == PIO_IOTYPE_NETCDF4P) &&
                  file->do_io)
         {
-            PLOG((2, "PIOc_inq calling netcdf-4 nc_inq_unlimdims"));
+            LOG((2, "PIOc_inq calling netcdf-4 nc_inq_unlimdims"));
             int *tmp_unlimdimids;
             ierr = nc_inq_unlimdims(file->fh, &tmp_nunlimdims, NULL);
             if (!ierr)
             {
                 if (nunlimdimsp)
                     *nunlimdimsp = tmp_nunlimdims;
-                PLOG((3, "tmp_nunlimdims = %d", tmp_nunlimdims));
+                LOG((3, "tmp_nunlimdims = %d", tmp_nunlimdims));
                 if (!(tmp_unlimdimids = malloc(tmp_nunlimdims * sizeof(int))))
                     ierr = PIO_ENOMEM;
                 if (!ierr)
@@ -382,7 +318,7 @@ PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
                 if (unlimdimidsp)
                     for (int d = 0; d < tmp_nunlimdims; d++)
                     {
-                        PLOG((3, "tmp_unlimdimids[%d] = %d", d, tmp_unlimdimids[d]));
+                        LOG((3, "tmp_unlimdimids[%d] = %d", d, tmp_unlimdimids[d]));
                         unlimdimidsp[d] = tmp_unlimdimids[d];
                     }
                 free(tmp_unlimdimids);
@@ -390,31 +326,32 @@ PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
         }
 #endif /* _NETCDF4 */
 
-        PLOG((2, "PIOc_inq_unlimdims netcdf call returned %d", ierr));
+        LOG((2, "PIOc_inq_unlimdims netcdf call returned %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if ((mpierr = MPI_Bcast(&tmp_nunlimdims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     if (nunlimdimsp)
         if ((mpierr = MPI_Bcast(nunlimdimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     if (unlimdimidsp)
         if ((mpierr = MPI_Bcast(unlimdimidsp, tmp_nunlimdims, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_typelen
  * Learn the name and size of a type.
  *
  * @param ncid the ncid of the open file.
@@ -422,18 +359,16 @@ PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
  * @param name pointer that will get the name of the type.
  * @param sizep pointer that will get the size of the type in bytes.
  * @returns 0 for success, error code otherwise.
- * @ingroup PIO_typelen_c
  * @author Ed Hartnett
  */
-int
-PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
+int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int ierr;              /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
 
-    PLOG((1, "PIOc_inq_type ncid = %d xtype = %d", ncid, xtype));
+    LOG((1, "PIOc_inq_type ncid = %d xtype = %d", ncid, xtype));
 
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -464,9 +399,9 @@ PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            return check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -479,12 +414,12 @@ PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
 
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_inq_type(file->fh, xtype, name, (size_t *)sizep);
-        PLOG((2, "PIOc_inq_type netcdf call returned %d", ierr));
+        LOG((2, "PIOc_inq_type netcdf call returned %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
@@ -495,36 +430,35 @@ PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
         if (ios->iomaster == MPI_ROOT)
             slen = strlen(name);
         if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
         if (!mpierr)
             if ((mpierr = MPI_Bcast((void *)name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
-                return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+                return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
     if (sizep)
         if ((mpierr = MPI_Bcast(sizep , 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_inq_format
  * Learn the netCDF format of an open file.
  *
  * @param ncid the ncid of an open file.
  * @param formatp a pointer that will get the format.
  * @returns 0 for success, error code otherwise.
- * @ingroup PIO_inq_format_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_format(int ncid, int *formatp)
+int PIOc_inq_format(int ncid, int *formatp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int ierr;              /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
 
-    PLOG((1, "PIOc_inq ncid = %d", ncid));
+    LOG((1, "PIOc_inq ncid = %d", ncid));
 
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -550,9 +484,9 @@ PIOc_inq_format(int ncid, int *formatp)
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            return check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -565,24 +499,25 @@ PIOc_inq_format(int ncid, int *formatp)
 
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_inq_format(file->fh, formatp);
-        PLOG((2, "PIOc_inq netcdf call returned %d", ierr));
+        LOG((2, "PIOc_inq netcdf call returned %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (formatp)
         if ((mpierr = MPI_Bcast(formatp , 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_inq_dim
  * The PIO-C interface for the NetCDF function nc_inq_dim.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -592,24 +527,18 @@ PIOc_inq_format(int ncid, int *formatp)
  *
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
- * @param dimid the dimension ID.
- * @param name a pointer that gets the name of the dimension. Igorned
- * if NULL. Name will be PIO_MAX_NAME chars or fewer.
  * @param lenp a pointer that will get the number of values
- * @return PIO_NOERR for success, error code otherwise.  See
- * @ingroup PIO_inq_dim_c
- * PIOc_Set_File_Error_Handling()
+ * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
+int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int ierr;              /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
 
-    PLOG((1, "PIOc_inq_dim ncid = %d dimid = %d", ncid, dimid));
+    LOG((1, "PIOc_inq_dim ncid = %d dimid = %d", ncid, dimid));
 
     /* Get the file info, based on the ncid. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -634,17 +563,17 @@ PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
                 mpierr = MPI_Bcast(&dimid, 1, MPI_INT, ios->compmaster, ios->intercomm);
             if (!mpierr)
                 mpierr = MPI_Bcast(&name_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            PLOG((2, "PIOc_inq netcdf Bcast name_present = %d", name_present));
+            LOG((2, "PIOc_inq netcdf Bcast name_present = %d", name_present));
             if (!mpierr)
                 mpierr = MPI_Bcast(&len_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            PLOG((2, "PIOc_inq netcdf Bcast len_present = %d", len_present));
+            LOG((2, "PIOc_inq netcdf Bcast len_present = %d", len_present));
         }
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            return check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -653,22 +582,22 @@ PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
-            PLOG((2, "calling ncmpi_inq_dim"));
+            LOG((2, "calling ncmpi_inq_dim"));
             ierr = ncmpi_inq_dim(file->fh, dimid, name, lenp);;
         }
 #endif /* _PNETCDF */
 
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
         {
-            PLOG((2, "calling nc_inq_dim"));
+            LOG((2, "calling nc_inq_dim"));
             ierr = nc_inq_dim(file->fh, dimid, name, (size_t *)lenp);;
         }
-        PLOG((2, "ierr = %d", ierr));
+        LOG((2, "ierr = %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
@@ -676,42 +605,42 @@ PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
     if (name)
     {
         int slen;
-        PLOG((2, "bcasting results my_comm = %d", ios->my_comm));
+        LOG((2, "bcasting results my_comm = %d", ios->my_comm));
         if (ios->iomaster == MPI_ROOT)
             slen = strlen(name);
         if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast((void *)name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     if (lenp)
         if ((mpierr = MPI_Bcast(lenp , 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
-    PLOG((2, "done with PIOc_inq_dim"));
+    LOG((2, "done with PIOc_inq_dim"));
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_inq_dimname
  * Find the name of a dimension.
  *
  * @param ncid the ncid of an open file.
  * @param dimid the dimension ID.
  * @param name a pointer that gets the name of the dimension. Igorned
- * if NULL. Name will be PIO_MAX_NAME chars or fewer.
+ * if NULL.
  * @returns 0 for success, error code otherwise.
- * @ingroup PIO_inq_dim_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_dimname(int ncid, int dimid, char *name)
+int PIOc_inq_dimname(int ncid, int dimid, char *name)
 {
-    PLOG((1, "PIOc_inq_dimname ncid = %d dimid = %d", ncid, dimid));
+    LOG((1, "PIOc_inq_dimname ncid = %d dimid = %d", ncid, dimid));
     return PIOc_inq_dim(ncid, dimid, name, NULL);
 }
 
 /**
+ * @ingroup PIO_inq_dimlen
  * Find the length of a dimension.
  *
  * @param ncid the ncid of an open file.
@@ -719,16 +648,15 @@ PIOc_inq_dimname(int ncid, int dimid, char *name)
  * @param lenp a pointer that gets the length of the dimension. Igorned
  * if NULL.
  * @returns 0 for success, error code otherwise.
- * @ingroup PIO_inq_dim_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_dimlen(int ncid, int dimid, PIO_Offset *lenp)
+int PIOc_inq_dimlen(int ncid, int dimid, PIO_Offset *lenp)
 {
     return PIOc_inq_dim(ncid, dimid, NULL, lenp);
 }
 
 /**
+ * @ingroup PIO_inq_dimid
  * The PIO-C interface for the NetCDF function nc_inq_dimid.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -738,14 +666,11 @@ PIOc_inq_dimlen(int ncid, int dimid, PIO_Offset *lenp)
  *
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
- * @param name pointer taht gets the name of the dimension.
  * @param idp a pointer that will get the id of the variable or attribute.
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
- * @ingroup PIO_inq_dim_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_dimid(int ncid, const char *name, int *idp)
+int PIOc_inq_dimid(int ncid, const char *name, int *idp)
 {
     iosystem_desc_t *ios;
     file_desc_t *file;
@@ -756,13 +681,13 @@ PIOc_inq_dimid(int ncid, const char *name, int *idp)
     if ((ierr = pio_get_file(ncid, &file)))
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__);
     ios = file->iosystem;
-    PLOG((2, "iosysid = %d", ios->iosysid));
+    LOG((2, "iosysid = %d", ios->iosysid));
 
     /* User must provide name shorter than NC_MAX_NAME +1. */
     if (!name || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_inq_dimid ncid = %d name = %s", ncid, name));
+    LOG((1, "PIOc_inq_dimid ncid = %d name = %s", ncid, name));
 
     /* If using async, and not an IO task, then send parameters. */
     if (ios->async)
@@ -788,9 +713,9 @@ PIOc_inq_dimid(int ncid, const char *name, int *idp)
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            return check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* IO tasks call the netCDF functions. */
@@ -804,23 +729,24 @@ PIOc_inq_dimid(int ncid, const char *name, int *idp)
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_inq_dimid(file->fh, name, idp);
     }
-    PLOG((3, "nc_inq_dimid call complete ierr = %d", ierr));
+    LOG((3, "nc_inq_dimid call complete ierr = %d", ierr));
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results. */
     if (idp)
         if ((mpierr = MPI_Bcast(idp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_inq_var
  * The PIO-C interface for the NetCDF function nc_inq_var.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -831,23 +757,13 @@ PIOc_inq_dimid(int ncid, const char *name, int *idp)
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
  * @param varid the variable ID.
- * @param name a pointer that gets the name of the dimension. Igorned
- * if NULL. Name will be PIO_MAX_NAME chars or fewer.
- * @param xtypep a pointer that will get the type of the
- * attribute. Ignored if NULL.
- * @param ndimsp a pointer that will get the number of
- * dimensions. Ignored if NULL.
- * @param dimidsp a pointer that will get an array of dimids. Ignored
- * if NULL.
- * @param nattsp a pointer that will get the number of
- * attributes. Ignored if NULL.
+ * @param xtypep a pointer that will get the type of the attribute.
+ * @param nattsp a pointer that will get the number of attributes
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_var_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_var(int ncid, int varid, char *name, nc_type *xtypep, int *ndimsp,
-             int *dimidsp, int *nattsp)
+int PIOc_inq_var(int ncid, int varid, char *name, nc_type *xtypep, int *ndimsp,
+                 int *dimidsp, int *nattsp)
 {
     iosystem_desc_t *ios;
     file_desc_t *file;
@@ -855,7 +771,7 @@ PIOc_inq_var(int ncid, int varid, char *name, nc_type *xtypep, int *ndimsp,
     int ierr;
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
 
-    PLOG((1, "PIOc_inq_var ncid = %d varid = %d", ncid, varid));
+    LOG((1, "PIOc_inq_var ncid = %d varid = %d", ncid, varid));
 
     /* Get the file info, based on the ncid. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -891,27 +807,27 @@ PIOc_inq_var(int ncid, int varid, char *name, nc_type *xtypep, int *ndimsp,
                 mpierr = MPI_Bcast(&dimids_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
             if (!mpierr)
                 mpierr = MPI_Bcast(&natts_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            PLOG((2, "PIOc_inq_var name_present = %d xtype_present = %d ndims_present = %d "
-                  "dimids_present = %d, natts_present = %d nattsp = %d",
-                  name_present, xtype_present, ndims_present, dimids_present, natts_present, nattsp));
+            LOG((2, "PIOc_inq_var name_present = %d xtype_present = %d ndims_present = %d "
+                 "dimids_present = %d, natts_present = %d nattsp = %d",
+                 name_present, xtype_present, ndims_present, dimids_present, natts_present, nattsp));
         }
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            return check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* Call the netCDF layer. */
     if (ios->ioproc)
     {
-        PLOG((2, "Calling the netCDF layer"));
+        LOG((2, "Calling the netCDF layer"));
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
             ierr = ncmpi_inq_varndims(file->fh, varid, &ndims);
-            PLOG((2, "from pnetcdf ndims = %d", ndims));
+            LOG((2, "from pnetcdf ndims = %d", ndims));
             if (!ierr)
                 ierr = ncmpi_inq_var(file->fh, varid, name, xtypep, ndimsp, dimidsp, nattsp);
         }
@@ -920,14 +836,14 @@ PIOc_inq_var(int ncid, int varid, char *name, nc_type *xtypep, int *ndimsp,
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
         {
             ierr = nc_inq_varndims(file->fh, varid, &ndims);
-            PLOG((3, "nc_inq_varndims called ndims = %d", ndims));
+            LOG((3, "nc_inq_varndims called ndims = %d", ndims));
             if (!ierr)
             {
                 char my_name[NC_MAX_NAME + 1];
                 nc_type my_xtype;
                 int my_ndims = 0, my_dimids[ndims], my_natts = 0;
                 ierr = nc_inq_var(file->fh, varid, my_name, &my_xtype, &my_ndims, my_dimids, &my_natts);
-                PLOG((3, "my_name = %s my_xtype = %d my_ndims = %d my_natts = %d",  my_name, my_xtype, my_ndims, my_natts));
+                LOG((3, "my_name = %s my_xtype = %d my_ndims = %d my_natts = %d",  my_name, my_xtype, my_ndims, my_natts));
                 if (!ierr)
                 {
                     if (name)
@@ -947,12 +863,12 @@ PIOc_inq_var(int ncid, int varid, char *name, nc_type *xtypep, int *ndimsp,
             }
         }
         if (ndimsp)
-            PLOG((2, "PIOc_inq_var ndims = %d ierr = %d", *ndimsp, ierr));
+            LOG((2, "PIOc_inq_var ndims = %d ierr = %d", *ndimsp, ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
@@ -963,53 +879,53 @@ PIOc_inq_var(int ncid, int varid, char *name, nc_type *xtypep, int *ndimsp,
         if (ios->iomaster == MPI_ROOT)
             slen = strlen(name);
         if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast((void *)name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
     if (xtypep)
         if ((mpierr = MPI_Bcast(xtypep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     if (ndimsp)
     {
-        PLOG((2, "PIOc_inq_var about to Bcast ndims = %d ios->ioroot = %d ios->my_comm = %d",
-              *ndimsp, ios->ioroot, ios->my_comm));
+        LOG((2, "PIOc_inq_var about to Bcast ndims = %d ios->ioroot = %d ios->my_comm = %d",
+             *ndimsp, ios->ioroot, ios->my_comm));
         if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
-        PLOG((2, "PIOc_inq_var Bcast ndims = %d", *ndimsp));
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
+        LOG((2, "PIOc_inq_var Bcast ndims = %d", *ndimsp));
     }
     if (dimidsp)
     {
         if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast(dimidsp, ndims, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
     if (nattsp)
         if ((mpierr = MPI_Bcast(nattsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_inq_varname
  * Get the name of a variable.
  *
  * @param ncid the ncid of the open file.
  * @param varid the variable ID.
  * @param name a pointer that will get the variable name.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_var_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_varname(int ncid, int varid, char *name)
+int PIOc_inq_varname(int ncid, int varid, char *name)
 {
     return PIOc_inq_var(ncid, varid, name, NULL, NULL, NULL, NULL);
 }
 
 /**
+ * @ingroup PIO_inq_vartype
  * Find the type of a variable.
  *
  * @param ncid the ncid of the open file.
@@ -1017,16 +933,15 @@ PIOc_inq_varname(int ncid, int varid, char *name)
  * @param xtypep a pointer that will get the type of the
  * attribute. Ignored if NULL.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_var_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_vartype(int ncid, int varid, nc_type *xtypep)
+int PIOc_inq_vartype(int ncid, int varid, nc_type *xtypep)
 {
     return PIOc_inq_var(ncid, varid, NULL, xtypep, NULL, NULL, NULL);
 }
 
 /**
+ * @ingroup PIO_inq_varndims
  * Find the number of dimensions of a variable.
  *
  * @param ncid the ncid of the open file.
@@ -1034,16 +949,15 @@ PIOc_inq_vartype(int ncid, int varid, nc_type *xtypep)
  * @param ndimsp a pointer that will get the number of
  * dimensions. Ignored if NULL.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_var_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_varndims(int ncid, int varid, int *ndimsp)
+int PIOc_inq_varndims(int ncid, int varid, int *ndimsp)
 {
     return PIOc_inq_var(ncid, varid, NULL, NULL, ndimsp, NULL, NULL);
 }
 
 /**
+ * @ingroup PIO_inq_vardimid
  * Find the dimension IDs associated with a variable.
  *
  * @param ncid the ncid of the open file.
@@ -1051,16 +965,15 @@ PIOc_inq_varndims(int ncid, int varid, int *ndimsp)
  * @param dimidsp a pointer that will get an array of dimids. Ignored
  * if NULL.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_var_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_vardimid(int ncid, int varid, int *dimidsp)
+int PIOc_inq_vardimid(int ncid, int varid, int *dimidsp)
 {
     return PIOc_inq_var(ncid, varid, NULL, NULL, NULL, dimidsp, NULL);
 }
 
 /**
+ * @ingroup PIO_inq_varnatts
  * Find the number of attributes associated with a variable.
  *
  * @param ncid the ncid of the open file.
@@ -1068,16 +981,15 @@ PIOc_inq_vardimid(int ncid, int varid, int *dimidsp)
  * @param nattsp a pointer that will get the number of attriburtes. Ignored
  * if NULL.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_var_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_varnatts(int ncid, int varid, int *nattsp)
+int PIOc_inq_varnatts(int ncid, int varid, int *nattsp)
 {
     return PIOc_inq_var(ncid, varid, NULL, NULL, NULL, NULL, nattsp);
 }
 
 /**
+ * @ingroup PIO_inq_varid
  * The PIO-C interface for the NetCDF function nc_inq_varid.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -1087,14 +999,12 @@ PIOc_inq_varnatts(int ncid, int varid, int *nattsp)
  *
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
- * @param name the variable name.
+ * @param varid the variable ID.
  * @param varidp a pointer that will get the variable id
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
- * @ingroup PIO_inq_var_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_varid(int ncid, const char *name, int *varidp)
+int PIOc_inq_varid(int ncid, const char *name, int *varidp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -1110,7 +1020,7 @@ PIOc_inq_varid(int ncid, const char *name, int *varidp)
     if (!name || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_inq_varid ncid = %d name = %s", ncid, name));
+    LOG((1, "PIOc_inq_varid ncid = %d name = %s", ncid, name));
 
     if (ios->async)
     {
@@ -1133,9 +1043,9 @@ PIOc_inq_varid(int ncid, const char *name, int *varidp)
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -1152,19 +1062,20 @@ PIOc_inq_varid(int ncid, const char *name, int *varidp)
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (varidp)
         if ((mpierr = MPI_Bcast(varidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
 
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_inq_att
  * The PIO-C interface for the NetCDF function nc_inq_att.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -1174,19 +1085,14 @@ PIOc_inq_varid(int ncid, const char *name, int *varidp)
  *
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
- * @param varid the variable ID or NC_GLOBAL.
- * @param name name of the attribute.
- * @param eh non-zero to handle errors in the function. This will
- * cause program to halt if PIO error handler is set to INTERNAL.
+ * @param varid the variable ID.
  * @param xtypep a pointer that will get the type of the attribute.
  * @param lenp a pointer that will get the number of values
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_att_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_att_eh(int ncid, int varid, const char *name, int eh,
-                nc_type *xtypep, PIO_Offset *lenp)
+int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
+                 PIO_Offset *lenp)
 {
     int msg = PIO_MSG_INQ_ATT;
     iosystem_desc_t *ios;
@@ -1203,7 +1109,7 @@ PIOc_inq_att_eh(int ncid, int varid, const char *name, int eh,
     if (!name || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_inq_att ncid = %d varid = %d", ncid, varid));
+    LOG((1, "PIOc_inq_att ncid = %d varid = %d", ncid, varid));
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
     if (ios->async)
@@ -1233,9 +1139,9 @@ PIOc_inq_att_eh(int ncid, int varid, const char *name, int eh,
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -1248,56 +1154,28 @@ PIOc_inq_att_eh(int ncid, int varid, const char *name, int eh,
 
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_inq_att(file->fh, varid, name, xtypep, (size_t *)lenp);
-        PLOG((2, "PIOc_inq netcdf call returned %d", ierr));
+        LOG((2, "PIOc_inq netcdf call returned %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
-    if (eh && ierr)
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
+    if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
-    /* Broadcast results if call succeeded. */
-    if (!ierr)
-    {
-        if (xtypep)
-            if ((mpierr = MPI_Bcast(xtypep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-                check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
-        if (lenp)
-            if ((mpierr = MPI_Bcast(lenp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
-                check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
-    }
+    /* Broadcast results. */
+    if (xtypep)
+        if ((mpierr = MPI_Bcast(xtypep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+            check_mpi(file, mpierr, __FILE__, __LINE__);
+    if (lenp)
+        if ((mpierr = MPI_Bcast(lenp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+            check_mpi(file, mpierr, __FILE__, __LINE__);
 
-    return ierr;
+    return PIO_NOERR;
 }
 
 /**
- * The PIO-C interface for the NetCDF function nc_inq_att.
- *
- * This routine is called collectively by all tasks in the communicator
- * ios.union_comm. For more information on the underlying NetCDF commmand
- * please read about this function in the NetCDF documentation at:
- * http://www.unidata.ucar.edu/software/netcdf/docs/group__attributes.html
- *
- * @param ncid the ncid of the open file, obtained from
- * PIOc_openfile() or PIOc_createfile().
- * @param varid the variable ID.
- * @param varid the variable ID or NC_GLOBAL.
- * @param name name of the attribute.
- * @param xtypep a pointer that will get the type of the attribute.
- * @param lenp a pointer that will get the number of values
- * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_att_c
- * @author Jim Edwards, Ed Hartnett
- */
-int
-PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
-             PIO_Offset *lenp)
-{
-    return PIOc_inq_att_eh(ncid, varid, name, 1, xtypep, lenp);
-}
-
-/**
+ * @ingroup PIO_inq_attlen
  * Get the length of an attribute.
  *
  * @param ncid the ID of an open file.
@@ -1306,16 +1184,15 @@ PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
  * @param lenp a pointer that gets the lenght of the attribute
  * array. Ignored if NULL.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_attlen_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_attlen(int ncid, int varid, const char *name, PIO_Offset *lenp)
+int PIOc_inq_attlen(int ncid, int varid, const char *name, PIO_Offset *lenp)
 {
     return PIOc_inq_att(ncid, varid, name, NULL, lenp);
 }
 
 /**
+ * @ingroup PIO_inq_atttype
  * Get the type of an attribute.
  *
  * @param ncid the ID of an open file.
@@ -1324,16 +1201,15 @@ PIOc_inq_attlen(int ncid, int varid, const char *name, PIO_Offset *lenp)
  * @param xtypep a pointer that gets the type of the
  * attribute. Ignored if NULL.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_atttype_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_atttype(int ncid, int varid, const char *name, nc_type *xtypep)
+int PIOc_inq_atttype(int ncid, int varid, const char *name, nc_type *xtypep)
 {
     return PIOc_inq_att(ncid, varid, name, xtypep, NULL);
 }
 
 /**
+ * @ingroup PIO_inq_attname
  * The PIO-C interface for the NetCDF function nc_inq_attname.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -1345,21 +1221,18 @@ PIOc_inq_atttype(int ncid, int varid, const char *name, nc_type *xtypep)
  * PIOc_openfile() or PIOc_createfile().
  * @param varid the variable ID.
  * @param attnum the attribute ID.
- * @param name the name of the attribute.
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
- * @ingroup PIO_inq_attname_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
+int PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int ierr;              /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
 
-    PLOG((1, "PIOc_inq_attname ncid = %d varid = %d attnum = %d", ncid, varid,
-          attnum));
+    LOG((1, "PIOc_inq_attname ncid = %d varid = %d attnum = %d", ncid, varid,
+         attnum));
 
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -1389,9 +1262,9 @@ PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -1404,12 +1277,12 @@ PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
 
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_inq_attname(file->fh, varid, attnum, name);
-        PLOG((2, "PIOc_inq_attname netcdf call returned %d", ierr));
+        LOG((2, "PIOc_inq_attname netcdf call returned %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
@@ -1418,16 +1291,17 @@ PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
     {
         int namelen = strlen(name);
         if ((mpierr = MPI_Bcast(&namelen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
         /* Casting to void to avoid warnings on some compilers. */
         if ((mpierr = MPI_Bcast((void *)name, namelen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_inq_attid
  * The PIO-C interface for the NetCDF function nc_inq_attid.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -1438,16 +1312,11 @@ PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
  * @param varid the variable ID.
- * @param name a pointer that will get name of attribute. Ignored if
- * NULL.
- * @param idp a pointer that will get the id of the variable or
- * attribute. Ignored if NULL.
+ * @param idp a pointer that will get the id of the variable or attribute.
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
- * @ingroup PIO_inq_attid_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
+int PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -1463,7 +1332,7 @@ PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
     if (!name || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_inq_attid ncid = %d varid = %d name = %s", ncid, varid, name));
+    LOG((1, "PIOc_inq_attid ncid = %d varid = %d name = %s", ncid, varid, name));
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
     if (ios->async)
@@ -1491,9 +1360,9 @@ PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -1506,24 +1375,25 @@ PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
 
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_inq_attid(file->fh, varid, name, idp);
-        PLOG((2, "PIOc_inq_attname netcdf call returned %d", ierr));
+        LOG((2, "PIOc_inq_attname netcdf call returned %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results. */
     if (idp)
         if ((mpierr = MPI_Bcast(idp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
 
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_rename_dim
  * The PIO-C interface for the NetCDF function nc_rename_dim.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -1533,15 +1403,10 @@ PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
  *
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
- * @param dimid the dimension ID.
- * @param name the new name for the dimension.
- * @return PIO_NOERR for success, error code otherwise. See
- * @ingroup PIO_rename_dim_c
- * PIOc_Set_File_Error_Handling().
+ * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_rename_dim(int ncid, int dimid, const char *name)
+int PIOc_rename_dim(int ncid, int dimid, const char *name)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -1557,7 +1422,7 @@ PIOc_rename_dim(int ncid, int dimid, const char *name)
     if (!name || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_rename_dim ncid = %d dimid = %d name = %s", ncid, dimid, name));
+    LOG((1, "PIOc_rename_dim ncid = %d dimid = %d name = %s", ncid, dimid, name));
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
     if (ios->async)
@@ -1578,15 +1443,15 @@ PIOc_rename_dim(int ncid, int dimid, const char *name)
                 mpierr = MPI_Bcast(&namelen, 1, MPI_INT,  ios->compmaster, ios->intercomm);
             if (!mpierr)
                 mpierr = MPI_Bcast((void *)name, namelen + 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            PLOG((2, "PIOc_rename_dim Bcast file->fh = %d dimid = %d namelen = %d name = %s",
-                  file->fh, dimid, namelen, name));
+            LOG((2, "PIOc_rename_dim Bcast file->fh = %d dimid = %d namelen = %d name = %s",
+                 file->fh, dimid, namelen, name));
         }
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
 
@@ -1600,12 +1465,12 @@ PIOc_rename_dim(int ncid, int dimid, const char *name)
 
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_rename_dim(file->fh, dimid, name);
-        PLOG((2, "PIOc_inq netcdf call returned %d", ierr));
+        LOG((2, "PIOc_inq netcdf call returned %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
@@ -1613,6 +1478,7 @@ PIOc_rename_dim(int ncid, int dimid, const char *name)
 }
 
 /**
+ * @ingroup PIO_rename_var
  * The PIO-C interface for the NetCDF function nc_rename_var.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -1623,14 +1489,10 @@ PIOc_rename_dim(int ncid, int dimid, const char *name)
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
  * @param varid the variable ID.
- * @param name the new name for the variable.
- * @return PIO_NOERR for success, error code otherwise. See
- * @ingroup PIO_rename_var_c
- * PIOc_Set_File_Error_Handling().
+ * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_rename_var(int ncid, int varid, const char *name)
+int PIOc_rename_var(int ncid, int varid, const char *name)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -1646,7 +1508,7 @@ PIOc_rename_var(int ncid, int varid, const char *name)
     if (!name || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_rename_var ncid = %d varid = %d name = %s", ncid, varid, name));
+    LOG((1, "PIOc_rename_var ncid = %d varid = %d name = %s", ncid, varid, name));
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
     if (ios->async)
@@ -1667,15 +1529,15 @@ PIOc_rename_var(int ncid, int varid, const char *name)
                 mpierr = MPI_Bcast(&namelen, 1, MPI_INT,  ios->compmaster, ios->intercomm);
             if (!mpierr)
                 mpierr = MPI_Bcast((void *)name, namelen + 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            PLOG((2, "PIOc_rename_var Bcast file->fh = %d varid = %d namelen = %d name = %s",
-                  file->fh, varid, namelen, name));
+            LOG((2, "PIOc_rename_var Bcast file->fh = %d varid = %d namelen = %d name = %s",
+                 file->fh, varid, namelen, name));
         }
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
 
@@ -1689,12 +1551,12 @@ PIOc_rename_var(int ncid, int varid, const char *name)
 
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_rename_var(file->fh, varid, name);
-        PLOG((2, "PIOc_inq netcdf call returned %d", ierr));
+        LOG((2, "PIOc_inq netcdf call returned %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
@@ -1702,6 +1564,7 @@ PIOc_rename_var(int ncid, int varid, const char *name)
 }
 
 /**
+ * @ingroup PIO_rename_att
  * The PIO-C interface for the NetCDF function nc_rename_att.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -1712,16 +1575,12 @@ PIOc_rename_var(int ncid, int varid, const char *name)
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
  * @param varid the variable ID.
- * @param name the name of the attribute.
- * @param newname the new name for the attribute.
- * @return PIO_NOERR for success, error code otherwise. See
- * @ingroup PIO_rename_att_c
- * PIOc_Set_File_Error_Handling().
+ * @return PIO_NOERR for success, error code otherwise.  See
+ * PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_rename_att(int ncid, int varid, const char *name,
-                const char *newname)
+int PIOc_rename_att(int ncid, int varid, const char *name,
+                    const char *newname)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -1738,8 +1597,8 @@ PIOc_rename_att(int ncid, int varid, const char *name,
         !newname || strlen(newname) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_rename_att ncid = %d varid = %d name = %s newname = %s",
-          ncid, varid, name, newname));
+    LOG((1, "PIOc_rename_att ncid = %d varid = %d name = %s newname = %s",
+         ncid, varid, name, newname));
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
     if (ios->async)
@@ -1769,9 +1628,9 @@ PIOc_rename_att(int ncid, int varid, const char *name,
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -1788,15 +1647,16 @@ PIOc_rename_att(int ncid, int varid, const char *name,
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
-    PLOG((2, "PIOc_rename_att succeeded"));
+    LOG((2, "PIOc_rename_att succeeded"));
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_del_att
  * The PIO-C interface for the NetCDF function nc_del_att.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -1809,11 +1669,9 @@ PIOc_rename_att(int ncid, int varid, const char *name,
  * @param varid the variable ID.
  * @param name of the attribute to delete.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_del_att_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_del_att(int ncid, int varid, const char *name)
+int PIOc_del_att(int ncid, int varid, const char *name)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -1829,7 +1687,7 @@ PIOc_del_att(int ncid, int varid, const char *name)
     if (!name || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_del_att ncid = %d varid = %d name = %s", ncid, varid, name));
+    LOG((1, "PIOc_del_att ncid = %d varid = %d name = %s", ncid, varid, name));
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
     if (ios->async)
@@ -1854,9 +1712,9 @@ PIOc_del_att(int ncid, int varid, const char *name)
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -1873,7 +1731,7 @@ PIOc_del_att(int ncid, int varid, const char *name)
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
@@ -1893,18 +1751,17 @@ PIOc_del_att(int ncid, int varid, const char *name)
  * @param fillmode either NC_FILL or NC_NOFILL.
  * @param old_modep a pointer to an int that gets the old setting.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_set_fill_c
+ * @ingroup PIO_set_fill
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_set_fill(int ncid, int fillmode, int *old_modep)
+int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int ierr;              /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI functions. */
 
-    PLOG((1, "PIOc_set_fill ncid = %d fillmode = %d", ncid, fillmode));
+    LOG((1, "PIOc_set_fill ncid = %d fillmode = %d", ncid, fillmode));
 
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -1919,7 +1776,7 @@ PIOc_set_fill(int ncid, int fillmode, int *old_modep)
             int msg = PIO_MSG_SET_FILL;
             int old_modep_present = old_modep ? 1 : 0;
 
-            PLOG((3, "PIOc_set_fill about to send msg %d", msg));
+            LOG((3, "PIOc_set_fill about to send msg %d", msg));
             if (ios->compmaster == MPI_ROOT)
                 mpierr = MPI_Send(&msg, 1,MPI_INT, ios->ioroot, 1, ios->union_comm);
 
@@ -1929,15 +1786,15 @@ PIOc_set_fill(int ncid, int fillmode, int *old_modep)
                 mpierr = MPI_Bcast(&fillmode, 1, MPI_INT, ios->compmaster, ios->intercomm);
             if (!mpierr)
                 mpierr = MPI_Bcast(&old_modep_present, 1, MPI_INT, ios->compmaster, ios->intercomm);
-            PLOG((2, "PIOc_set_fill sent ncid = %d fillmode = %d old_modep_present = %d", ncid, fillmode,
-                  old_modep_present));
+            LOG((2, "PIOc_set_fill sent ncid = %d fillmode = %d old_modep_present = %d", ncid, fillmode,
+                 old_modep_present));
         }
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -1946,7 +1803,7 @@ PIOc_set_fill(int ncid, int fillmode, int *old_modep)
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
-            PLOG((3, "about to call ncmpi_set_fill() fillmode = %d", fillmode));
+            LOG((3, "about to call ncmpi_set_fill() fillmode = %d", fillmode));
             ierr = ncmpi_set_fill(file->fh, fillmode, old_modep);
         }
 #endif /* _PNETCDF */
@@ -1957,23 +1814,24 @@ PIOc_set_fill(int ncid, int fillmode, int *old_modep)
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results. */
     if (old_modep)
     {
-        PLOG((2, "old_mode = %d", *old_modep));
+        LOG((2, "old_mode = %d", *old_modep));
         if ((mpierr = MPI_Bcast(old_modep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
-    PLOG((2, "PIOc_set_fill succeeded"));
+    LOG((2, "PIOc_set_fill succeeded"));
     return PIO_NOERR;
 }
 
 /**
+ * @ingroup PIO_enddef
  * The PIO-C interface for the NetCDF function nc_enddef.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -1984,16 +1842,15 @@ PIOc_set_fill(int ncid, int fillmode, int *old_modep)
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_enddef_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_enddef(int ncid)
+int PIOc_enddef(int ncid)
 {
     return pioc_change_def(ncid, 1);
 }
 
 /**
+ * @ingroup PIO_redef
  * The PIO-C interface for the NetCDF function nc_redef.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2004,16 +1861,15 @@ PIOc_enddef(int ncid)
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_redef_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_redef(int ncid)
+int PIOc_redef(int ncid)
 {
     return pioc_change_def(ncid, 0);
 }
 
 /**
+ * @ingroup PIO_def_dim
  * The PIO-C interface for the NetCDF function nc_def_dim.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2023,15 +1879,11 @@ PIOc_redef(int ncid)
  *
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
- * @param name name of the dimension.
- * @param len length of the dimension.
  * @param idp a pointer that will get the id of the variable or attribute.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_def_dim_c
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
+int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2047,7 +1899,7 @@ PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
     if (!name || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_def_dim ncid = %d name = %s len = %d", ncid, name, len));
+    LOG((1, "PIOc_def_dim ncid = %d name = %s len = %d", ncid, name, len));
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
     if (ios->async)
@@ -2074,9 +1926,9 @@ PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
@@ -2093,16 +1945,16 @@ PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (idp)
         if ((mpierr = MPI_Bcast(idp , 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
 
-    PLOG((2, "def_dim ierr = %d", ierr));
+    LOG((2, "def_dim ierr = %d", ierr));
     return PIO_NOERR;
 }
 
@@ -2116,18 +1968,14 @@ PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
  *
  * @param ncid the ncid of the open file, obtained from
  * PIOc_openfile() or PIOc_createfile().
- * @param name the variable name.
- * @param xtype the PIO_TYPE of the variable.
- * @param ndims the number of dimensions.
- * @param dimidsp pointer to array of dimension IDs.
- * @param varidp a pointer that will get the variable ID.
+ * @param varid the variable ID.
+ * @param varidp a pointer that will get the variable id
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_def_var_c
+ * @ingroup PIO_def_var
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
-             const int *dimidsp, int *varidp)
+int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
+                 const int *dimidsp, int *varidp)
 {
     iosystem_desc_t *ios;      /* Pointer to io system information. */
     file_desc_t *file;         /* Pointer to file information. */
@@ -2149,8 +1997,8 @@ PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     if (!name || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_def_var ncid = %d name = %s xtype = %d ndims = %d", ncid, name,
-          xtype, ndims));
+    LOG((1, "PIOc_def_var ncid = %d name = %s xtype = %d ndims = %d", ncid, name,
+         xtype, ndims));
 
     /* Run this on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. Learn whether each dimension
@@ -2166,13 +2014,10 @@ PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         /* Get the MPI type corresponding with the PIO type. */
         if ((ierr = find_mpi_type(xtype, &mpi_type, NULL)))
             return pio_err(ios, NULL, ierr, __FILE__, __LINE__);
-
+        
         /* Get the size of the MPI type. */
-        if(mpi_type == MPI_DATATYPE_NULL)
-            mpi_type_size = 0;
-        else
-            if ((mpierr = MPI_Type_size(mpi_type, &mpi_type_size)))
-                return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+        if ((mpierr = MPI_Type_size(mpi_type, &mpi_type_size)))
+            return check_mpi2(ios, NULL, mpierr, __FILE__, __LINE__);
 
         /* How many unlimited dims are present in the file? */
         if ((ierr = PIOc_inq_unlimdims(ncid, &nunlimdims, NULL)))
@@ -2241,21 +2086,21 @@ PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
         if ((mpierr = MPI_Bcast(&rec_var, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast(&invalid_unlim_dim, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast(&pio_type_size, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast(&mpi_type, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast(&mpi_type_size, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* Check that only one unlimited dim is specified, and that it is
@@ -2273,8 +2118,6 @@ PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_def_var(file->fh, name, xtype, ndims, dimidsp, &varid);
-        PLOG((3, "defined var ierr %d file->iotype %d", ierr, file->iotype));
-
 #ifdef _NETCDF4
         /* For netCDF-4 serial files, turn on compression for this variable. */
         if (!ierr && file->iotype == PIO_IOTYPE_NETCDF4C)
@@ -2288,13 +2131,13 @@ PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results. */
     if ((mpierr = MPI_Bcast(&varid, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        check_mpi(file, mpierr, __FILE__, __LINE__);
     if (varidp)
         *varidp = varid;
 
@@ -2329,13 +2172,12 @@ PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
  * @param ncid the ncid of the open file.
  * @param varid the ID of the variable to set chunksizes for.
  * @param fill_mode fill mode for this variable (NC_FILL or NC_NOFILL)
- * @param fill_valuep pointer to the fill value to be used if fill_mode is set to NC_FILL.
+ * @param fill_value pointer to the fill value to be used if fill_mode is set to NC_FILL.
  * @return PIO_NOERR for success, otherwise an error code.
- * @ingroup PIO_def_var_c
+ * @ingroup PIO_def_var
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_valuep)
+int PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_valuep)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2344,8 +2186,8 @@ PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_valuep)
     int ierr;              /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
 
-    PLOG((1, "PIOc_def_var_fill ncid = %d varid = %d fill_mode = %d\n", ncid, varid,
-          fill_mode));
+    LOG((1, "PIOc_def_var_fill ncid = %d varid = %d fill_mode = %d\n", ncid, varid,
+         fill_mode));
 
     /* Get the file info. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -2366,8 +2208,8 @@ PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_valuep)
             return check_netcdf(file, ierr, __FILE__, __LINE__);
         if ((ierr = PIOc_inq_type(ncid, xtype, NULL, &type_size)))
             return check_netcdf(file, ierr, __FILE__, __LINE__);
-        PLOG((2, "PIOc_def_var_fill type_size = %d", type_size));
     }
+    LOG((2, "PIOc_def_var_fill type_size = %d", type_size));
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
     if (ios->async)
@@ -2393,21 +2235,21 @@ PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_valuep)
             if (!mpierr && fill_value_present)
                 mpierr = MPI_Bcast((PIO_Offset *)fill_valuep, type_size, MPI_CHAR, ios->compmaster,
                                    ios->intercomm);
-            PLOG((2, "PIOc_def_var_fill ncid = %d varid = %d fill_mode = %d type_size = %d fill_value_present = %d",
-                  ncid, varid, fill_mode, type_size, fill_value_present));
+            LOG((2, "PIOc_def_var_fill ncid = %d varid = %d fill_mode = %d type_size = %d fill_value_present = %d",
+                 ncid, varid, fill_mode, type_size, fill_value_present));
         }
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            return check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            return check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
         if ((mpierr = MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast(&type_size, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     if (ios->ioproc)
@@ -2420,13 +2262,9 @@ PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_valuep)
         }
         else if (file->iotype == PIO_IOTYPE_NETCDF)
         {
-            PLOG((2, "defining fill value attribute for netCDF classic file"));
+            LOG((2, "defining fill value attribute for netCDF classic file"));
             if (file->do_io)
-            {
-                ierr = nc_set_fill(file->fh, NC_FILL, NULL);
-                if (!ierr)
-                    ierr = nc_put_att(file->fh, varid, _FillValue, xtype, 1, fill_valuep);
-            }
+                ierr = nc_put_att(file->fh, varid, _FillValue, xtype, 1, fill_valuep);
         }
         else
         {
@@ -2435,12 +2273,12 @@ PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_valuep)
                 ierr = nc_def_var_fill(file->fh, varid, fill_mode, fill_valuep);
 #endif
         }
-        PLOG((2, "after def_var_fill ierr = %d", ierr));
+        LOG((2, "after def_var_fill ierr = %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
@@ -2464,11 +2302,10 @@ PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_valuep)
  * @param fill_valuep pointer to space that gets the fill value for
  * this variable. Ignored if NULL.
  * @return PIO_NOERR for success, error code otherwise.
- * @ingroup PIO_inq_var_c
+ * @ingroup PIO_inq_var_fill
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
+int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2477,13 +2314,13 @@ PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;  /* Return code from function calls. */
 
-    PLOG((1, "PIOc_inq_var_fill ncid = %d varid = %d", ncid, varid));
+    LOG((1, "PIOc_inq_var_fill ncid = %d varid = %d", ncid, varid));
 
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__);
     ios = file->iosystem;
-    PLOG((2, "found file"));
+    LOG((2, "found file"));
 
     /* Run this on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. Get the size of this vars
@@ -2494,7 +2331,7 @@ PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
             return check_netcdf(file, ierr, __FILE__, __LINE__);
         if ((ierr = PIOc_inq_type(ncid, xtype, NULL, &type_size)))
             return check_netcdf(file, ierr, __FILE__, __LINE__);
-        PLOG((2, "PIOc_inq_var_fill type_size = %d", type_size));
+        LOG((2, "PIOc_inq_var_fill type_size = %d", type_size));
     }
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
@@ -2506,7 +2343,7 @@ PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
             char no_fill_present = no_fill ? true : false;
             char fill_value_present = fill_valuep ? true : false;
 
-            PLOG((2, "sending msg type_size = %d", type_size));
+            LOG((2, "sending msg type_size = %d", type_size));
             if (ios->compmaster == MPI_ROOT)
                 mpierr = MPI_Send(&msg, 1,MPI_INT, ios->ioroot, 1, ios->union_comm);
 
@@ -2520,28 +2357,28 @@ PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
                 mpierr = MPI_Bcast(&no_fill_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
             if (!mpierr)
                 mpierr = MPI_Bcast(&fill_value_present, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            PLOG((2, "PIOc_inq_var_fill ncid = %d varid = %d type_size = %lld no_fill_present = %d fill_value_present = %d",
-                  ncid, varid, type_size, no_fill_present, fill_value_present));
+            LOG((2, "PIOc_inq_var_fill ncid = %d varid = %d type_size = %lld no_fill_present = %d fill_value_present = %d",
+                 ncid, varid, type_size, no_fill_present, fill_value_present));
         }
 
         /* Handle MPI errors. */
         if ((mpierr2 = MPI_Bcast(&mpierr, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr2, __FILE__, __LINE__);
+            check_mpi(file, mpierr2, __FILE__, __LINE__);
         if (mpierr)
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
         if ((mpierr = MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast(&type_size, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
-        PLOG((2, "calling inq_var_fill file->iotype = %d file->fh = %d varid = %d",
-              file->iotype, file->fh, varid));
+        LOG((2, "calling inq_var_fill file->iotype = %d file->fh = %d varid = %d",
+             file->iotype, file->fh, varid));
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
 #ifdef _PNETCDF
@@ -2613,31 +2450,25 @@ PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
                 ierr = nc_inq_var_fill(file->fh, varid, no_fill, fill_valuep);
 #endif /* _NETCDF */
         }
-        PLOG((2, "after call to inq_var_fill, ierr = %d", ierr));
+        LOG((2, "after call to inq_var_fill, ierr = %d", ierr));
     }
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (no_fill)
         if ((mpierr = MPI_Bcast(no_fill, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
     if (fill_valuep)
         if ((mpierr = MPI_Bcast(fill_valuep, type_size, MPI_CHAR, ios->ioroot, ios->my_comm)))
-            check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            check_mpi(file, mpierr, __FILE__, __LINE__);
 
     return PIO_NOERR;
 }
-
-/**
- * @addtogroup PIO_get_att_c Get Attribute Values
- * Get the values stored in an attribute in C.
- * @{
- */
 
 /**
  * Get the value of an attribute of any type, with no type conversion.
@@ -2651,10 +2482,10 @@ PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
  * @param name the name of the attribute to get
  * @param ip a pointer that will get the attribute value.
  * @return PIO_NOERR for success, error code otherwise.
+ * @ingroup PIO_get_att
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att(int ncid, int varid, const char *name, void *ip)
+int PIOc_get_att(int ncid, int varid, const char *name, void *ip)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2670,17 +2501,41 @@ PIOc_get_att(int ncid, int varid, const char *name, void *ip)
     if (!name || !ip || strlen(name) > NC_MAX_NAME)
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__);
 
-    PLOG((1, "PIOc_get_att ncid %d varid %d name %s", ncid, varid, name));
+    LOG((1, "PIOc_get_att ncid %d varid %d name %s", ncid, varid, name));
 
     /* Get the type of the attribute. */
     if ((ierr = PIOc_inq_att(ncid, varid, name, &atttype, NULL)))
-        return ierr;
-    PLOG((2, "atttype = %d", atttype));
+        return check_netcdf(file, ierr, __FILE__, __LINE__);
+    LOG((2, "atttype = %d", atttype));
 
     return PIOc_get_att_tc(ncid, varid, name, atttype, ip);
 }
 
 /**
+ * @ingroup PIO_put_att
+ * Write a netCDF attribute of any type.
+ *
+ * This routine is called collectively by all tasks in the communicator
+ * ios.union_comm.
+ *
+ * @param ncid the ncid of the open file, obtained from
+ * PIOc_openfile() or PIOc_createfile().
+ * @param varid the variable ID.
+ * @param name the name of the attribute.
+ * @param xtype the nc_type of the attribute.
+ * @param len the length of the attribute array.
+ * @param op a pointer with the attribute data.
+ * @return PIO_NOERR for success, error code otherwise.
+ * @author Jim Edwards, Ed Hartnett
+ */
+int PIOc_put_att(int ncid, int varid, const char *name, nc_type xtype,
+                 PIO_Offset len, const void *op)
+{
+    return PIOc_put_att_tc(ncid, varid, name, xtype, len, xtype, op);
+}
+
+/**
+ * @ingroup PIO_get_att
  * Get the value of an 64-bit floating point array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2694,13 +2549,13 @@ PIOc_get_att(int ncid, int varid, const char *name, void *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_double(int ncid, int varid, const char *name, double *ip)
+int PIOc_get_att_double(int ncid, int varid, const char *name, double *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_DOUBLE, (void *)ip);
 }
 
 /**
+ * @ingroup PIO_get_att
  * Get the value of an 8-bit unsigned char array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2714,13 +2569,13 @@ PIOc_get_att_double(int ncid, int varid, const char *name, double *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
+int PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_UBYTE, (void *)ip);
 }
 
 /**
+ * @ingroup PIO_get_att
  * Get the value of an 16-bit unsigned integer array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2734,8 +2589,7 @@ PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *ip)
+int PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_USHORT, (void *)ip);
 }
@@ -2752,15 +2606,16 @@ PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *ip)
  * @param name the name of the attribute to get
  * @param ip a pointer that will get the attribute value.
  * @return PIO_NOERR for success, error code otherwise.
+ * @ingroup PIO_get_att
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_uint(int ncid, int varid, const char *name, unsigned int *ip)
+int PIOc_get_att_uint(int ncid, int varid, const char *name, unsigned int *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_UINT, (void *)ip);
 }
 
 /**
+ * @ingroup PIO_get_att
  * Get the value of an 32-bit ingeger array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2774,8 +2629,7 @@ PIOc_get_att_uint(int ncid, int varid, const char *name, unsigned int *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_long(int ncid, int varid, const char *name, long *ip)
+int PIOc_get_att_long(int ncid, int varid, const char *name, long *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_LONG_INTERNAL, (void *)ip);
 }
@@ -2794,15 +2648,16 @@ PIOc_get_att_long(int ncid, int varid, const char *name, long *ip)
  * @param name the name of the attribute to get
  * @param ip a pointer that will get the attribute value.
  * @return PIO_NOERR for success, error code otherwise.
+ * @ingroup PIO_get_att
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_text(int ncid, int varid, const char *name, char *ip)
+int PIOc_get_att_text(int ncid, int varid, const char *name, char *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_CHAR, (void *)ip);
 }
 
 /**
+ * @ingroup PIO_get_att
  * Get the value of an 8-bit signed char array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2816,13 +2671,13 @@ PIOc_get_att_text(int ncid, int varid, const char *name, char *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
+int PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_BYTE, (void *)ip);
 }
 
 /**
+ * @ingroup PIO_get_att
  * Get the value of an 64-bit unsigned integer array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2836,13 +2691,13 @@ PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_ulonglong(int ncid, int varid, const char *name, unsigned long long *ip)
+int PIOc_get_att_ulonglong(int ncid, int varid, const char *name, unsigned long long *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_UINT64, (void *)ip);
 }
 
 /**
+ * @ingroup PIO_get_att
  * Get the value of an 16-bit integer array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2856,13 +2711,13 @@ PIOc_get_att_ulonglong(int ncid, int varid, const char *name, unsigned long long
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_short(int ncid, int varid, const char *name, short *ip)
+int PIOc_get_att_short(int ncid, int varid, const char *name, short *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_SHORT, (void *)ip);
 }
 
 /**
+ * @ingroup PIO_get_att
  * Get the value of an 32-bit integer array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2876,13 +2731,13 @@ PIOc_get_att_short(int ncid, int varid, const char *name, short *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_int(int ncid, int varid, const char *name, int *ip)
+int PIOc_get_att_int(int ncid, int varid, const char *name, int *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_INT, (void *)ip);
 }
 
 /**
+ * @ingroup PIO_get_att
  * Get the value of an 64-bit integer array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2896,13 +2751,13 @@ PIOc_get_att_int(int ncid, int varid, const char *name, int *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_longlong(int ncid, int varid, const char *name, long long *ip)
+int PIOc_get_att_longlong(int ncid, int varid, const char *name, long long *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_INT64, (void *)ip);
 }
 
 /**
+ * @ingroup PIO_get_att
  * Get the value of an 32-bit floating point array attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2916,46 +2771,13 @@ PIOc_get_att_longlong(int ncid, int varid, const char *name, long long *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_get_att_float(int ncid, int varid, const char *name, float *ip)
+int PIOc_get_att_float(int ncid, int varid, const char *name, float *ip)
 {
     return PIOc_get_att_tc(ncid, varid, name, PIO_FLOAT, (void *)ip);
 }
 
 /**
- * @}
- */
-
-/**
- * @addtogroup PIO_put_att_c Write an Attribute
- * Create an attribute in C.
- * @{
- */
-
-/**
- * Write a netCDF attribute of any type.
- *
- * This routine is called collectively by all tasks in the communicator
- * ios.union_comm.
- *
- * @param ncid the ncid of the open file, obtained from
- * PIOc_openfile() or PIOc_createfile().
- * @param varid the variable ID.
- * @param name the name of the attribute.
- * @param xtype the nc_type of the attribute.
- * @param len the length of the attribute array.
- * @param op a pointer with the attribute data.
- * @return PIO_NOERR for success, error code otherwise.
- * @author Jim Edwards, Ed Hartnett
- */
-int
-PIOc_put_att(int ncid, int varid, const char *name, nc_type xtype,
-             PIO_Offset len, const void *op)
-{
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, xtype, op);
-}
-
-/**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 8-bit signed chars.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2971,14 +2793,14 @@ PIOc_put_att(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_schar(int ncid, int varid, const char *name, nc_type xtype,
-                   PIO_Offset len, const signed char *op)
+int PIOc_put_att_schar(int ncid, int varid, const char *name, nc_type xtype,
+                       PIO_Offset len, const signed char *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_BYTE, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 32-bit signed integers.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -2994,14 +2816,14 @@ PIOc_put_att_schar(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_long(int ncid, int varid, const char *name, nc_type xtype,
-                  PIO_Offset len, const long *op)
+int PIOc_put_att_long(int ncid, int varid, const char *name, nc_type xtype,
+                      PIO_Offset len, const long *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_LONG_INTERNAL, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 32-bit signed integers.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3017,14 +2839,14 @@ PIOc_put_att_long(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_int(int ncid, int varid, const char *name, nc_type xtype,
-                 PIO_Offset len, const int *op)
+int PIOc_put_att_int(int ncid, int varid, const char *name, nc_type xtype,
+                     PIO_Offset len, const int *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_INT, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 8-bit unsigned chars.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3040,14 +2862,14 @@ PIOc_put_att_int(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_uchar(int ncid, int varid, const char *name, nc_type xtype,
-                   PIO_Offset len, const unsigned char *op)
+int PIOc_put_att_uchar(int ncid, int varid, const char *name, nc_type xtype,
+                       PIO_Offset len, const unsigned char *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_UBYTE, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 64-bit signed integers.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3063,14 +2885,14 @@ PIOc_put_att_uchar(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_longlong(int ncid, int varid, const char *name, nc_type xtype,
-                      PIO_Offset len, const long long *op)
+int PIOc_put_att_longlong(int ncid, int varid, const char *name, nc_type xtype,
+                          PIO_Offset len, const long long *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_INT64, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 32-bit unsigned integers.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3086,14 +2908,14 @@ PIOc_put_att_longlong(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_uint(int ncid, int varid, const char *name, nc_type xtype,
-                  PIO_Offset len, const unsigned int *op)
+int PIOc_put_att_uint(int ncid, int varid, const char *name, nc_type xtype,
+                      PIO_Offset len, const unsigned int *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 32-bit floating points.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3109,14 +2931,14 @@ PIOc_put_att_uint(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_float(int ncid, int varid, const char *name, nc_type xtype,
-                   PIO_Offset len, const float *op)
+int PIOc_put_att_float(int ncid, int varid, const char *name, nc_type xtype,
+                       PIO_Offset len, const float *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_FLOAT, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 64-bit unsigned integers.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3132,14 +2954,14 @@ PIOc_put_att_float(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_ulonglong(int ncid, int varid, const char *name, nc_type xtype,
-                       PIO_Offset len, const unsigned long long *op)
+int PIOc_put_att_ulonglong(int ncid, int varid, const char *name, nc_type xtype,
+                           PIO_Offset len, const unsigned long long *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT64, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 16-bit unsigned integers.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3155,14 +2977,14 @@ PIOc_put_att_ulonglong(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_ushort(int ncid, int varid, const char *name, nc_type xtype,
-                    PIO_Offset len, const unsigned short *op)
+int PIOc_put_att_ushort(int ncid, int varid, const char *name, nc_type xtype,
+                        PIO_Offset len, const unsigned short *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_USHORT, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF text attribute.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3172,19 +2994,20 @@ PIOc_put_att_ushort(int ncid, int varid, const char *name, nc_type xtype,
  * PIOc_openfile() or PIOc_createfile().
  * @param varid the variable ID.
  * @param name the name of the attribute.
+ * @param xtype the nc_type of the attribute.
  * @param len the length of the attribute array.
  * @param op a pointer with the attribute data.
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_text(int ncid, int varid, const char *name,
-                  PIO_Offset len, const char *op)
+int PIOc_put_att_text(int ncid, int varid, const char *name,
+                      PIO_Offset len, const char *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, NC_CHAR, len, NC_CHAR, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 16-bit integers.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3200,14 +3023,14 @@ PIOc_put_att_text(int ncid, int varid, const char *name,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_short(int ncid, int varid, const char *name, nc_type xtype,
-                   PIO_Offset len, const short *op)
+int PIOc_put_att_short(int ncid, int varid, const char *name, nc_type xtype,
+                       PIO_Offset len, const short *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_SHORT, op);
 }
 
 /**
+ * @ingroup PIO_put_att
  * Write a netCDF attribute array of 64-bit floating points.
  *
  * This routine is called collectively by all tasks in the communicator
@@ -3223,12 +3046,8 @@ PIOc_put_att_short(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int
-PIOc_put_att_double(int ncid, int varid, const char *name, nc_type xtype,
-                    PIO_Offset len, const double *op)
+int PIOc_put_att_double(int ncid, int varid, const char *name, nc_type xtype,
+                        PIO_Offset len, const double *op)
 {
     return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_DOUBLE, op);
 }
-/**
- * @}
- */

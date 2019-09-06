@@ -1,13 +1,8 @@
 !>
 !! @file 
-!! User interface Module for PIO, this is the only file a user program should 'use'.
-!! @author Jim Edwards
+!! @brief User interface Module for PIO, this is the only file a user program should 'use'
+!! 
 !<
-
-!>
-!! @defgroup PIO_set_blocksize Box Rearranger Settings
-!! Set the box rearranger blocksize in Fortran.
-#include "config.h"
 
 module pio
 ! Package all exposed variables and functions under one roof
@@ -23,11 +18,6 @@ module pio
        pio_finalize, pio_set_hint, pio_getnumiotasks, pio_file_is_open, &
        PIO_deletefile, PIO_get_numiotasks, PIO_iotype_available, &
        pio_set_rearr_opts
-
-#ifdef NETCDF_INTEGRATION
-  use ncint_mod, only: nf_def_iosystem, nf_free_iosystem, &
-       nf_def_decomp, nf_free_decomp, nf_put_vard_int
-#endif
 
   use pio_types, only : io_desc_t, file_desc_t, var_desc_t, iosystem_desc_t, &
        pio_rearr_opt_t, pio_rearr_comm_fc_opt_t, pio_rearr_comm_fc_2d_enable,&
@@ -87,11 +77,15 @@ module pio
   implicit none
   public
 contains
-  !>
-  !! @ingroup PIO_set_blocksize
-  !! @brief Set the target blocksize for the box rearranger
-  !! @author Jim Edwards
-  !<
+!>
+!! @public
+!! @defgroup PIO_set_blocksize
+!<
+!>
+!! @public
+!! @ingroup PIO_set_blocksize
+!! @brief Set the target blocksize for the box rearranger
+!<
   subroutine pio_set_blocksize(blocksize)
     integer :: blocksize
     integer :: ierr
@@ -106,10 +100,10 @@ contains
   end subroutine pio_set_blocksize
 
 
-  !>
-  !! Logical function returns true if the task is an IO task.
-  !! @author Jim Edwards
-  !<
+!>
+!! @public
+!! @brief Logical function returns true if the task is an IO task.
+!<
   function pio_iam_iotask(iosystem) result(task)
     use iso_c_binding
     type(iosystem_desc_t), intent(in) :: iosystem
@@ -129,10 +123,10 @@ contains
     task = ctask
   end function pio_iam_iotask
   
-  !>
-  !! Integer function returns rank of IO task.
-  !! @author Jim Edwards
-  !<
+!>
+!! @public
+!! @brief Integer function returns rank of IO task.
+!<
   function pio_iotask_rank(iosystem) result(rank)
     type(iosystem_desc_t), intent(in) :: iosystem
     integer :: rank, ierr
@@ -148,10 +142,10 @@ contains
     ierr = PIOc_iotask_rank(iosystem%iosysid, rank)
   end function pio_iotask_rank
 
-  !>
-  !! Sets active to true if IO system is active.
-  !! @author Jim Edwards
-  !<
+!>
+!! @public
+!! @brief Sets active to true if IO system is active.
+!<
   subroutine pio_iosystem_is_active(iosystem, active)
     use iso_c_binding
     type(iosystem_desc_t), intent(in) :: iosystem
@@ -170,6 +164,7 @@ contains
     ierr = PIOc_iosystem_is_active(iosystem%iosysid, lactive)
     active = lactive
   end subroutine pio_iosystem_is_active
+
 
 end module pio
 

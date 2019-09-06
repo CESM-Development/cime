@@ -1,6 +1,7 @@
 !>
-!! @file
-!! Internal code for compiler workarounds, aborts and debug functions.
+!! @file pio_support.F90
+!! @brief internal code for compiler workarounds, aborts and debug functions
+!!
 !<
 module pio_support
   use pio_kinds
@@ -19,23 +20,25 @@ module pio_support
   public :: pio_writedof
   public :: replace_c_null
 
-  logical, public :: Debug=.FALSE.            !< debug mode
-  logical, public :: DebugIO=.FALSE.          !< IO debug mode
-  logical, public :: DebugAsync=.FALSE.       !< async debug mode
+  logical, public :: Debug=.FALSE.
+  logical, public :: DebugIO=.FALSE.
+  logical, public :: DebugAsync=.FALSE.
   integer,private,parameter :: versno = 1001
 
   character(len=*), parameter :: modName='pio_support'
 
 contains
-  !> Remove null termination (C-style) from strings for Fortran.
-  !<
+!> 
+!! @public
+!! @brief Remove null termination (C-style) from strings for Fortran.
+!<
   subroutine replace_c_null(istr, ilen)
     use iso_c_binding, only : C_NULL_CHAR
     character(len=*),intent(inout) :: istr
     integer(kind=pio_offset_kind), optional, intent(in) :: ilen
     integer :: i, slen
     if(present(ilen)) then
-       slen = int(ilen)
+       slen = ilen
     else
        slen = len(istr)
     endif
@@ -45,17 +48,32 @@ contains
     istr(i:slen)=''
   end subroutine replace_c_null
 
-  !>
-  !! Abort the model for abnormal termination.
-  !!
-  !! @param file File where piodie is called from.
-  !! @param line Line number where it is called.
-  !! @param msg,msg2,msg3,ival1,ival2,ival3,mpirank : Optional
-  !! argument for error messages.
-  !! @author Jim Edwards
-  !<
+!>
+!! @public
+!! @brief Abort the model for abnormal termination.
+!! @param file : File where piodie is called from.
+!! @param line : Line number where it is called.
+!! @param msg,msg2,msg3,ival1,ival2,ival3,mpirank : Optional argument for error messages.
+!<
   subroutine piodie (file,line, msg, ival1, msg2, ival2, msg3, ival3, mpirank)
+    !-----------------------------------------------------------------------
+    ! Purpose:
+    !
+    ! Abort the model for abnormal termination
+    !
+    ! Author: Jim Edwards
+    !
+    ! Change History
+    ! 20070608 R. Loy  added optional args
+    !-----------------------------------------------------------------------
+    ! $Id$
+    !-----------------------------------------------------------------------
+    !-----------------------------------------------------------------------
     implicit none
+    !-----------------------------------------------------------------------
+    !
+    ! Arguments
+    !
     character(len=*), intent(in) :: file
     integer,intent(in) :: line
     character(len=*), intent(in), optional :: msg,msg2,msg3
@@ -63,7 +81,7 @@ contains
 
     character(len=*), parameter :: subName=modName//'::pio_die'
     integer :: ierr, myrank=-1
-
+    
     if(present(mpirank)) myrank=mpirank
 
     if (present(ival3)) then
@@ -86,8 +104,8 @@ contains
 
 
 #if defined(CPRXLF) && !defined(BGQ)
-    close(5)    ! needed to prevent batch jobs from hanging in xl__trbk
-    call xl__trbk()
+  close(5)    ! needed to prevent batch jobs from hanging in xl__trbk
+  call xl__trbk()
 #endif
 
     ! passing an argument of 1 to mpi_abort will lead to a STOPALL output 
@@ -100,51 +118,69 @@ contains
     call abort
 #endif
 
+
   end subroutine piodie
 
-  !>
-  !! Check and prints an error message if an error occured in an MPI
-  !! subroutine.
-  !!
-  !! @param locmesg Message to output
-  !! @param errcode MPI error code
-  !! @param file The file where the error message originated.
-  !! @param line The line number where the error message originated.
-  !! @author Jim Edwards
-  !<
+!=============================================
+!  CheckMPIreturn:
+!
+!      Check and prints an error message
+!  if an error occured in a MPI subroutine.
+!=============================================
+!>
+!! @public
+!! @brief Check and prints an error message if an error occured in an MPI 
+!! subroutine.
+!! @param locmesg : Message to output
+!! @param errcode : MPI error code
+!! @param file : The file where the error message originated.
+!! @param line : The line number where the error message originated.
+!<
   subroutine CheckMPIreturn(locmesg, errcode, file, line)
 
-    character(len=*), intent(in) :: locmesg
-    integer(i4), intent(in) :: errcode
-    character(len=*),optional :: file
-    integer, intent(in),optional :: line
-    character(len=MPI_MAX_ERROR_STRING) :: errorstring
+     character(len=*), intent(in) :: locmesg
+     integer(i4), intent(in) :: errcode
+     character(len=*),optional :: file
+     integer, intent(in),optional :: line
+     character(len=MPI_MAX_ERROR_STRING) :: errorstring
 
-    integer(i4) :: errorlen
+     integer(i4) :: errorlen
 
-    integer(i4) :: ierr
-    if (errcode .ne. MPI_SUCCESS) then
-       call MPI_Error_String(errcode,errorstring,errorlen,ierr)
-       write(*,*) TRIM(ADJUSTL(locmesg))//errorstring(1:errorlen)
-       if(present(file).and.present(line)) then
-          call piodie(file,line)
-       endif
-    end if
+     integer(i4) :: ierr
+     if (errcode .ne. MPI_SUCCESS) then
+        call MPI_Error_String(errcode,errorstring,errorlen,ierr)
+        write(*,*) TRIM(ADJUSTL(locmesg))//errorstring(1:errorlen)
+        if(present(file).and.present(line)) then
+           call piodie(file,line)
+        endif
+     end if
   end subroutine CheckMPIreturn
 
-  !>
-  !! Fortran interface to write a mapping file.
-  !!
-  !! @param file : The file where the decomp map will be written.
-  !! @param gdims : The dimensions of the data array in memory.
-  !! @param DOF : The multidimensional array of indexes that describes how
-  !! data in memory are written to a file.
-  !! @param comm : The MPI comm index.
-  !! @param punit : Optional argument that is no longer used.
-  !! @author T Craig
-  !<
+!>
+!! @public
+!! @brief Fortran interface to write a mapping file
+!! @param file : The file where the decomp map will be written.
+!! @param gdims : The dimensions of the data array in memory.
+!! @param DOF : The multidimensional array of indexes that describes how 
+!! data in memory are written to a file.
+!! @param comm : The MPI comm index.
+!! @param punit : Optional argument that is no longer used.
+!<
   subroutine pio_writedof (file, gdims, DOF, comm, punit)
+    !-----------------------------------------------------------------------
+    ! Purpose:
+    !
+    ! Write a DOF to standard format
+    !
+    ! Author: T Craig
+    !
+    !-----------------------------------------------------------------------
+    !-----------------------------------------------------------------------
     implicit none
+    !-----------------------------------------------------------------------
+    !
+    ! Arguments
+    !
     character(len=*),intent(in) :: file
     integer, intent(in) :: gdims(:)
     integer(PIO_OFFSET_KIND)  ,intent(in) :: dof(:)
@@ -152,7 +188,7 @@ contains
     integer,optional,intent(in) :: punit
     integer :: err
     integer :: ndims
-
+    
 
     interface
        integer(c_int) function PIOc_writemap_from_f90(file, ndims, gdims, maplen, map, f90_comm) &
@@ -166,27 +202,40 @@ contains
          integer(C_INT), value, intent(in) :: f90_comm
        end function PIOc_writemap_from_f90
     end interface
-    if (present(punit)) continue ! to suppress warning
     ndims = size(gdims)
     err = PIOc_writemap_from_f90(trim(file)//C_NULL_CHAR, ndims, gdims, int(size(dof),C_SIZE_T), dof, comm)
 
   end subroutine pio_writedof
 
-  !>
-  !! Fortran interface to read a mapping file.
-  !!
-  !! @param file The file from where the decomp map is read.
-  !! @param ndims The number of dimensions of the data.
-  !! @param gdims The actual dimensions of the data (pointer to an
-  !! integer array of length ndims).
-  !! @param DOF Pointer to an integer array where the Decomp map will
-  !! be stored.
-  !! @param comm MPI comm index
-  !! @param punit Optional argument that is no longer used.
-  !! @author T Craig
-  !<
+!>
+!! @public
+!! @brief Fortran interface to read a mapping file
+!! @param file : The file from where the decomp map is read.
+!! @param ndims : The number of dimensions of the data.
+!! @param gdims : The actual dimensions of the data (pointer to an integer array of length ndims).
+!! @param DOF : Pointer to an integer array where the Decomp map will be stored.
+!! @param comm : MPI comm index
+!! @param punit : Optional argument that is no longer used.
+!<
   subroutine pio_readdof (file, ndims, gdims, DOF, comm, punit)
+    !-----------------------------------------------------------------------
+    ! Purpose:
+    !
+    ! Read a DOF to standard format
+    !
+    ! Author: T Craig
+    !
+    ! Change History
+    ! 
+    !-----------------------------------------------------------------------
+    ! $Id$
+    !-----------------------------------------------------------------------
+    !-----------------------------------------------------------------------
     implicit none
+    !-----------------------------------------------------------------------
+    !
+    ! Arguments
+    !
     character(len=*),intent(in) :: file
     integer(PIO_OFFSET_KIND),pointer:: dof(:)
     integer         ,intent(in) :: comm
@@ -208,12 +257,14 @@ contains
          integer(C_INT), value, intent(in) :: f90_comm
        end function PIOc_readmap_from_f90
     end interface
-    if (present(punit)) continue ! to suppress warning
+
     ierr = PIOc_readmap_from_f90(trim(file)//C_NULL_CHAR, ndims, tgdims, maplen, tmap, comm);
 
     call c_f_pointer(tgdims, gdims, (/ndims/))
     call c_f_pointer(tmap, DOF, (/maplen/))
-    !    DOF = DOF+1
+!    DOF = DOF+1
   end subroutine pio_readdof
+
+
 
 end module pio_support
