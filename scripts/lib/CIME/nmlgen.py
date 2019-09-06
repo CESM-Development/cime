@@ -475,9 +475,7 @@ class NamelistGenerator(object):
             for i, filename in enumerate(domain_filenames.split("\n")):
                 if filename.strip() == '':
                     continue
-                filepath, filename = os.path.split(filename)
-                if not filepath:
-                    filepath = os.path.join(domain_filepath, os.path.dirname(filename.strip()))
+                filepath = os.path.join(domain_filepath, filename.strip())
                 string = "domain{:d} = {}\n".format(i+1, filepath)
                 hashValue = hashlib.md5(string.rstrip().encode('utf-8')).hexdigest()
                 if hashValue not in lines_hash:
@@ -575,7 +573,7 @@ class NamelistGenerator(object):
                         continue
                     file_path = character_literal_to_string(literal)
                     # NOTE - these are hard-coded here and a better way is to make these extensible
-                    if file_path == 'UNSET' or file_path == 'idmap' or file_path == 'idmap_ignore' or file_path == 'unset':
+                    if file_path == 'UNSET' or file_path == 'unset' or file_path == 'idmap':
                         continue
                     if file_path == 'null':
                         continue
@@ -626,7 +624,7 @@ class NamelistGenerator(object):
                         for literal in literals:
                             file_path = character_literal_to_string(literal)
                             # NOTE - these are hard-coded here and a better way is to make these extensible
-                            if file_path == 'UNSET' or file_path == 'idmap' or file_path == 'idmap_ignore':
+                            if file_path == 'UNSET' or file_path == 'idmap':
                                 continue
                             if input_pathname == 'abs':
                                 # No further mangling needed for absolute paths.
@@ -677,32 +675,34 @@ class NamelistGenerator(object):
         if data_list_path is not None:
             self._write_input_files(data_list_path)
 
-
     # For MCT
     def add_nmlcontents(self, filename, group, append=True, format_="nmlcontents", sorted_groups=True):
         """ Write only contents of nml group """
         self._namelist.write(filename, groups=[group], append=append, format_=format_, sorted_groups=sorted_groups)
 
+    # For MCT
     def write_seq_maps(self, filename):
-        """ Write mct out seq_maps.rc"""
+        """ Write out seq_maps.rc"""
         self._namelist.write(filename, groups=["seq_maps"], format_="rc")
 
+    # For MCT
     def write_modelio_file(self, filename):
-        """ Write mct component modelio files"""
+        """ Write  component modelio files"""
         self._namelist.write(filename, groups=["modelio", "pio_inparm"], format_="nml")
 
     # For NUOPC
     def write_nuopc_modelio_file(self, filename):
-        """ Write nuopc component modelio files"""
+        """ Write  nuopc component modelio files"""
         self._namelist.write(filename, groups=["pio_inparm"], format_="nml")
 
-
     # For NUOPC
-    def write_nuopc_config_file(self, filename, data_list_path=None, skip_comps=None):
+    def write_nuopc_config_file(self, filename, data_list_path=None,
+                                skip_comps=None, atm_cpl_dt=None, ocn_cpl_dt=None):
         """ Write the nuopc config file"""
         self._definition.validate(self._namelist)
         groups = self._namelist.get_group_names()
-        self._namelist.write(filename, skip_comps=skip_comps, groups=groups, format_='nuopc', sorted_groups=False)
+        self._namelist.write(filename, groups=groups, format_='nuopc', sorted_groups=False,
+                             skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
         if data_list_path is not None:
             # append to input_data_list file
             self._write_input_files(data_list_path)

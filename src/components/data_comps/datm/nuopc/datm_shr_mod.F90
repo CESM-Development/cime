@@ -6,10 +6,11 @@ module datm_shr_mod
   use shr_const_mod  , only : SHR_CONST_CDAY,SHR_CONST_TKFRZ,SHR_CONST_SPVAL
   use shr_file_mod   , only : shr_file_getlogunit, shr_file_getunit, shr_file_freeunit
   use shr_sys_mod    , only : shr_sys_flush, shr_sys_abort
-  use shr_cal_mod    , only : shr_cal_date2julian
+  use shr_strdata_mod, only : shr_strdata_readnml
   use shr_dmodel_mod , only : shr_dmodel_mapset
+  use shr_cal_mod    , only : shr_cal_date2julian
   use shr_ncread_mod , only : shr_ncread_varExists, shr_ncread_varDimSizes, shr_ncread_field4dG
-  use shr_strdata_mod, only : shr_strdata_readnml, shr_strdata_type
+  use shr_strdata_mod, only : shr_strdata_type
   use mct_mod
 
   ! !PUBLIC TYPES:
@@ -35,12 +36,8 @@ module datm_shr_mod
   ! Public data
   !--------------------------------------------------------------------------
 
-  ! Note that model decomp will now come from reading in the mesh directly
-
-  ! stream data type
-  type(shr_strdata_type), public :: SDATM
-
   ! input namelist variables
+  character(CL) , public :: decomp                ! decomp strategy
   character(CL) , public :: restfilm              ! model restart file namelist
   character(CL) , public :: restfils              ! stream restart file namelist
   character(CL) , public :: bias_correct          ! true => send bias correction fields to coupler
@@ -61,21 +58,26 @@ module datm_shr_mod
 CONTAINS
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  subroutine datm_shr_read_namelists(filename, mpicom, my_task, master_task, &
-       logunit, atm_prognostic)
+  subroutine datm_shr_read_namelists(mpicom, my_task, master_task, &
+       inst_index, inst_suffix, inst_name, &
+       logunit, SDATM, atm_present, atm_prognostic)
 
     ! !INPUT/OUTPUT PARAMETERS:
-    character(len=*)       , intent(in)    :: filename       ! input namelist filename
     integer(IN)            , intent(in)    :: mpicom         ! mpi communicator
     integer(IN)            , intent(in)    :: my_task        ! my task in mpi communicator mpicom
     integer(IN)            , intent(in)    :: master_task    ! task number of master task
+    integer                , intent(in)    :: inst_index     ! number of current instance (ie. 1)
+    character(len=16)      , intent(in)    :: inst_suffix    ! char string associated with instance
+    character(len=16)      , intent(in)    :: inst_name      ! fullname of current instance (ie. "lnd_0001")
     integer(IN)            , intent(in)    :: logunit        ! logging unit number
+    type(shr_strdata_type) , intent(inout) :: SDATM
+    logical                , intent(out)   :: atm_present    ! flag
     logical                , intent(out)   :: atm_prognostic ! flag
 
     !--- local variables ---
+    character(CL) :: fileName    ! generic file name
     integer(IN)   :: nunit       ! unit number
     integer(IN)   :: ierr        ! error code
-    character(CL) :: decomp      ! decomp strategy - not used for NUOPC - but still needed in namelist for now
 
     !--- formats ---
     character(*), parameter :: F00   = "('(datm_comp_init) ',8a)"
@@ -85,21 +87,27 @@ CONTAINS
     !-------------------------------------------------------------------------------
 
     !----- define namelist -----
-    namelist / datm_nml / decomp, &
-         iradsw, factorFn, restfilm, restfils, presaero, bias_correct, &
+    namelist / datm_nml / &
+         decomp, iradsw, factorFn, restfilm, restfils, presaero, bias_correct, &
          anomaly_forcing, force_prognostic_true, wiso_datm
+
+    !----------------------------------------------------------------------------
+    ! Determine input filenamname
+    !----------------------------------------------------------------------------
+
+    filename = "datm_in"//trim(inst_suffix)
 
     !----------------------------------------------------------------------------
     ! Read datm_in
     !----------------------------------------------------------------------------
 
+    decomp = "1d"
     iradsw = 0
     factorFn = 'null'
     restfilm = trim(nullstr)
     restfils = trim(nullstr)
     presaero = .false.
     force_prognostic_true = .false.
-
     if (my_task == master_task) then
        nunit = shr_file_getUnit() ! get unused unit number
        open (nunit,file=trim(filename),status="old",action="read")
@@ -111,22 +119,27 @@ CONTAINS
           write(logunit,F01) 'ERROR: reading input namelist, '//trim(filename)//' iostat=',ierr
           call shr_sys_abort(subName//': namelist read error '//trim(filename))
        end if
+       write(logunit,F00)' decomp   = ',trim(decomp)
        write(logunit,F01)' iradsw   = ',iradsw
        write(logunit,F00)' factorFn = ',trim(factorFn)
        write(logunit,F00)' restfilm = ',trim(restfilm)
        write(logunit,F00)' restfils = ',trim(restfils)
        write(logunit,F0L)' presaero = ',presaero
        write(logunit,F0L)' force_prognostic_true = ',force_prognostic_true
-       write(logunit,F0L)' wiso_datm   = ',wiso_datm
+       write(logunit,F0L)' wiso_datm   = ', wiso_datm
+       write(logunit,F01) 'inst_index  =  ',inst_index
+       write(logunit,F00) 'inst_name   =  ',trim(inst_name)
+       write(logunit,F00) 'inst_suffix =  ',trim(inst_suffix)
        call shr_sys_flush(logunit)
     endif
-    call shr_mpi_bcast(iradsw                ,mpicom, 'iradsw')
-    call shr_mpi_bcast(factorFn              ,mpicom, 'factorFn')
-    call shr_mpi_bcast(restfilm              ,mpicom, 'restfilm')
-    call shr_mpi_bcast(restfils              ,mpicom, 'restfils')
-    call shr_mpi_bcast(presaero              ,mpicom, 'presaero')
-    call shr_mpi_bcast(force_prognostic_true ,mpicom, 'force_prognostic_true')
-    call shr_mpi_bcast(wiso_datm             ,mpicom, 'wiso_datm')
+    call shr_mpi_bcast(decomp,mpicom,'decomp')
+    call shr_mpi_bcast(iradsw,mpicom,'iradsw')
+    call shr_mpi_bcast(factorFn,mpicom,'factorFn')
+    call shr_mpi_bcast(restfilm,mpicom,'restfilm')
+    call shr_mpi_bcast(restfils,mpicom,'restfils')
+    call shr_mpi_bcast(presaero,mpicom,'presaero')
+    call shr_mpi_bcast(force_prognostic_true,mpicom,'force_prognostic_true')
+    call shr_mpi_bcast(wiso_datm, mpicom, 'wiso_datm')
 
     rest_file = trim(restfilm)
     rest_file_strm = trim(restfils)
@@ -159,10 +172,15 @@ CONTAINS
     ! Determine present and prognostic flag
     !----------------------------------------------------------------------------
 
+    atm_present = .false.
     atm_prognostic = .false.
     if (force_prognostic_true) then
+       atm_present    = .true.
        atm_prognostic = .true.
     endif
+    if (trim(datamode) /= 'NULL') then
+       atm_present = .true.
+    end if
 
   end subroutine datm_shr_read_namelists
 
@@ -249,6 +267,8 @@ CONTAINS
   subroutine datm_shr_CORE2getFactors(fileName,windF,winddF,qsatF,mpicom,compid, &
        gsmap,ggrid,nxg,nyg)
 
+    
+
     !--- arguments ---
     character(*)    ,intent(in)    :: fileName   ! file name string
     real(R8)        ,intent(inout) :: windF(:)   ! wind adjustment factor
@@ -263,6 +283,8 @@ CONTAINS
 
     !--- local ---
     integer(IN) :: my_task,logunit,ier
+
+    !--- formats ---
     character(*),parameter :: subName =  '(datm_shr_CORE2getFactors) '
     character(*),parameter :: F00    = "('(datm_shr_CORE2getFactors) ',4a) "
     !-------------------------------------------------------------------------------
@@ -290,9 +312,10 @@ CONTAINS
   end subroutine datm_shr_CORE2getFactors
 
   !===============================================================================
-
   subroutine datm_shr_TN460getFactors(fileName,windF,qsatF,mpicom,compid, &
        gsmap,ggrid,nxg,nyg)
+
+    
 
     !--- arguments ---
     character(*)    ,intent(in)    :: fileName   ! file name string
@@ -308,8 +331,11 @@ CONTAINS
     !--- local ---
     integer(IN) :: my_task,logunit,ier
     real(R8),pointer :: winddF(:)  ! wind adjustment factor
+
+    !--- formats ---
     character(*),parameter :: subName =  '(datm_shr_TN460getFactors) '
     character(*),parameter :: F00    = "('(datm_shr_TN460getFactors) ',4a) "
+
     !-------------------------------------------------------------------------------
 
     call MPI_COMM_RANK(mpicom,my_task,ier)
@@ -334,7 +360,6 @@ CONTAINS
   end subroutine datm_shr_TN460getFactors
 
   !===============================================================================
-
   subroutine datm_shr_getFactors(fileName,windF,winddF,qsatF,mpicom,compid, &
        gsmapo,ggrido,nxgo,nygo)
 
@@ -379,10 +404,12 @@ CONTAINS
     real(R8)   ,allocatable :: tempR4D(:,:,:,:)   ! 4D data array
     real(R8)   ,pointer     :: tempR1D(:)         ! 1D data array
     integer(IN),allocatable :: tempI4D(:,:,:,:)   ! 4D data array
-    character(*),parameter  :: subName =  '(datm_shr_getFactors) '
-    character(*),parameter  :: F00    = "('(datm_shr_getFactors) ',4a) "
-    character(*),parameter  :: F01    = "('(datm_shr_getFactors) ',a,2i5)"
-    character(*),parameter  :: F02    = "('(datm_shr_getFactors) ',a,6e12.3)"
+
+    !--- formats ---
+    character(*),parameter :: subName =  '(datm_shr_getFactors) '
+    character(*),parameter :: F00    = "('(datm_shr_getFactors) ',4a) "
+    character(*),parameter :: F01    = "('(datm_shr_getFactors) ',a,2i5)"
+    character(*),parameter :: F02    = "('(datm_shr_getFactors) ',a,6e12.3)"
 
     !-------------------------------------------------------------------------------
     !   Note: gsmapi is all gridcells on root pe
@@ -578,7 +605,6 @@ CONTAINS
   end subroutine datm_shr_getFactors
 
   !===============================================================================
-
   real(R8) function datm_shr_eSat(tK,tKbot)
 
     !--- arguments ---

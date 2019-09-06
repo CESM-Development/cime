@@ -18,6 +18,7 @@ def create_dirs(self):
     incroot  = self.get_value("INCROOT")
     rundir   = self.get_value("RUNDIR")
     caseroot = self.get_value("CASEROOT")
+
     docdir = os.path.join(caseroot, "CaseDocs")
     dirs_to_make = []
     models = self.get_values("COMP_CLASSES")
@@ -33,10 +34,7 @@ def create_dirs(self):
                 logger.debug("Making dir '{}'".format(dir_to_make))
                 os.makedirs(dir_to_make)
             except OSError as e:
-                # In a multithreaded situation, we may have lost a race to create this dir.
-                # We do not want to crash if that's the case.
-                if not os.path.isdir(dir_to_make):
-                    expect(False, "Could not make directory '{}', error: {}".format(dir_to_make, e))
+                expect(False, "Could not make directory '{}', error: {}".format(dir_to_make, e))
 
     # As a convenience write the location of the case directory in the bld and run directories
     for dir_ in (exeroot, rundir):
@@ -61,6 +59,7 @@ def create_namelists(self, component=None):
     self.load_env()
 
     self.stage_refcase()
+
 
     logger.info("Creating component namelists")
 
@@ -100,8 +99,8 @@ def create_namelists(self, component=None):
         except (OSError, IOError) as e:
             expect(False, "Failed to write {}/README: {}".format(docdir, e))
 
-    for cpglob in ["*_in_[0-9]*", "*modelio*", "*_in", "nuopc.runconfig",
-                   "*streams*txt*", "*stxt", "*maps.rc", "*cism.config*", "nuopc.runseq"]:
+    for cpglob in ["*_in_[0-9]*", "*modelio*", "*_in", "cesm.runconfig*",
+                   "*streams*txt*", "*stxt", "*maps.rc", "*cism.config*"]:
         for file_to_copy in glob.glob(os.path.join(rundir, cpglob)):
             logger.debug("Copy file from '{}' to '{}'".format(file_to_copy, docdir))
             safe_copy(file_to_copy, docdir)

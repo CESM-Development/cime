@@ -143,7 +143,7 @@ int main(int argc, char **argv)
             ERR(ret);
 
         /* This should fail. */
-        if (PIOc_free_iosystem(iosysid + TEST_VAL_42) != PIO_EBADID)
+        if (PIOc_finalize(iosysid + TEST_VAL_42) != PIO_EBADID)
             ERR(ERR_WRONG);
 
         /* Initialize another PIO system. */
@@ -190,22 +190,16 @@ int main(int argc, char **argv)
                 ERR(ret);
             if ((ret = PIOc_closefile(ncid2)))
                 ERR(ret);
-
-            /* Wait for everyone to finish. */
-            if ((ret = MPI_Barrier(test_comm)))
-                MPIERR(ret);
-
         } /* next iotype */
-
         if ((ret = MPI_Comm_free(&newcomm)))
             MPIERR(ret);
 
         /* Finalize PIO system. */
-        if ((ret = PIOc_free_iosystem(iosysid)))
+        if ((ret = PIOc_finalize(iosysid)))
             ERR(ret);
 
         /* Finalize PIO system. */
-        if ((ret = PIOc_free_iosystem(iosysid_world)))
+        if ((ret = PIOc_finalize(iosysid_world)))
             ERR(ret);
     } /* my_rank < TARGET_NTASKS */
 

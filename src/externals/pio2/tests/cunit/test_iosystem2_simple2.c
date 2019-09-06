@@ -36,8 +36,10 @@ int main(int argc, char **argv)
     int ntasks; /* Number of processors involved in current execution. */
     int iosysid; /* The ID for the parallel I/O system. */
     int iosysid_world; /* The ID for the parallel I/O system. */
-    MPI_Comm test_comm;
+    int num_flavors; /* Number of PIO netCDF flavors in this build. */
+    int flavor[NUM_FLAVORS]; /* iotypes for the supported netCDF IO flavors. */
     int ret; /* Return code. */
+    MPI_Comm test_comm;
 
     /* Initialize test. */
     if ((ret = pio_test_init2(argc, argv, &my_rank, &ntasks, TARGET_NTASKS, TARGET_NTASKS,
@@ -47,16 +49,13 @@ int main(int argc, char **argv)
     /* Only do something on the first TARGET_NTASKS tasks. */
     if (my_rank < TARGET_NTASKS)
     {
-	int num_flavors; /* Number of PIO netCDF flavors in this build. */
-	int flavor[NUM_FLAVORS]; /* iotypes for the supported netCDF IO flavors. */
-	
         /* Figure out iotypes. */
         if ((ret = get_iotypes(&num_flavors, flavor)))
             ERR(ret);
 
         /* Split world into odd and even. */
         MPI_Comm newcomm;
-        int even = (my_rank % 2) ? 0 : 1;
+        int even = my_rank % 2 ? 0 : 1;
         if ((ret = MPI_Comm_split(test_comm, even, 0, &newcomm)))
             MPIERR(ret);
 
@@ -76,12 +75,12 @@ int main(int argc, char **argv)
 
         for (int flv = 0; flv < num_flavors; flv++)
         {
-            char filename[NUM_SAMPLES][PIO_MAX_NAME + 1]; /* Test filename. */
+            char filename[NUM_SAMPLES][NC_MAX_NAME + 1]; /* Test filename. */
             int sample_ncid[NUM_SAMPLES];
 
             for (int sample = 0; sample < NUM_SAMPLES; sample++)
             {
-                char iotype_name[PIO_MAX_NAME + 1];
+                char iotype_name[NC_MAX_NAME + 1];
 
                 /* Create a filename. */
                 if ((ret = get_iotype_name(flavor[flv], iotype_name)))
@@ -120,11 +119,11 @@ int main(int argc, char **argv)
             MPIERR(ret);
 
         /* Finalize PIO odd/even intracomm. */
-        if ((ret = PIOc_free_iosystem(iosysid)))
+        if ((ret = PIOc_finalize(iosysid)))
             ERR(ret);
 
         /* Finalize PIO world intracomm. */
-        if ((ret = PIOc_free_iosystem(iosysid_world)))
+        if ((ret = PIOc_finalize(iosysid_world)))
             ERR(ret);
     }  /* my_rank < TARGET_NTASKS */
 

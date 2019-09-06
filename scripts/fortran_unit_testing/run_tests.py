@@ -160,10 +160,12 @@ def cmake_stage(name, test_spec_dir, build_optimized, use_mpiserial, mpirun_comm
                               that need it
     build_optimized (logical) - If True, we'll build in optimized rather than debug mode
     """
+    # Clear CMake cache.
     if clean:
-        if os.path.isfile("CMakeCache.txt"):
+        pwd_contents = os.listdir(os.getcwd())
+        if "CMakeCache.txt" in pwd_contents:
             os.remove("CMakeCache.txt")
-        if os.path.isdir("CMakeFiles"):
+        if "CMakeFiles" in pwd_contents:
             rmtree("CMakeFiles")
 
     if not os.path.isfile("CMakeCache.txt"):
@@ -237,7 +239,7 @@ def find_pfunit(compilerobj, mpilib, use_openmp):
     - use_openmp: Boolean
     """
     attrs = {"MPILIB": mpilib,
-             "compile_threaded": "TRUE" if use_openmp else "FALSE"
+             "compile_threaded": "true" if use_openmp else "false"
              }
 
     pfunit_path = compilerobj.get_optional_compiler_node("PFUNIT_PATH", attributes=attrs)
@@ -294,13 +296,6 @@ def _main():
 
     # Switch to the build directory.
     os.chdir(build_dir)
-    if clean:
-        pwd_contents = os.listdir(os.getcwd())
-        # Clear CMake cache.
-        for file_ in pwd_contents:
-            if file_ in ("Macros.cmake", "env_mach_specific.xml") \
-                    or file_.startswith('Depends') or file_.startswith(".env_mach_specific"):
-                os.remove(file_)
 
     #=================================================
     # Functions to perform various stages of build.
@@ -332,8 +327,14 @@ def _main():
 
     fake_case = FakeCase(compiler, mpilib, debug, comp_interface)
     machspecific.load_env(fake_case)
-    cmake_args = "{}-DOS={} -DCOMPILER={} -DDEBUG={} -DMPILIB={} -Dcompile_threaded={}".format(
-        "" if not cmake_args else " ", os_, compiler, stringify_bool(debug), mpilib, stringify_bool(use_openmp))
+    os.environ["OS"] = os_
+    os.environ["COMPILER"] = compiler
+    os.environ["DEBUG"] = stringify_bool(debug)
+    os.environ["MPILIB"] = mpilib
+    if use_openmp:
+        os.environ["compile_threaded"] = "true"
+    else:
+        os.environ["compile_threaded"] = "false"
 
     os.environ["UNIT_TEST_HOST"] = socket.gethostname()
     if "NETCDF_PATH" in os.environ and not "NETCDF" in os.environ:
@@ -354,7 +355,7 @@ def _main():
         }
 
         # We can get away with specifying case=None since we're using exe_only=True
-        mpirun_command, _, _, _ = machspecific.get_mpirun(None, mpi_attribs, None, exe_only=True)
+        mpirun_command, _ = machspecific.get_mpirun(None, mpi_attribs, None, exe_only=True)
         mpirun_command = machspecific.get_resolved_value(mpirun_command)
         logger.info("mpirun command is '{}'".format(mpirun_command))
 

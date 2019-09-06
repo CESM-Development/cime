@@ -13,7 +13,7 @@ Here is a simple example:
 
    > cd $CIMEROOT/scripts
    > create_clone --case $CASEROOT --clone $CLONEROOT
-   > cd $CASEROOT
+   > cd $CLONEROOT
    > case.build
    > case.submit
 
@@ -36,7 +36,7 @@ the executable of the original case you are cloning from.
 ::
 
    > create_clone --case $CASEROOT --clone $CLONEROOT --keepexe
-   > cd $CASEROOT
+   > cd $CLONEROOT
    > case.submit
 
 If the ``--keepexe`` optional argument is used, then no SourceMods

@@ -218,13 +218,13 @@ if [ $MACH == "UNSET" ]; then
       MACH="cheyenne"
     ;;
     geyser* )
-      MACH="dav"
+      MACH="geyser"
     ;;
     caldera* )
-      MACH="dav"
+      MACH="caldera"
     ;;
     pronghorn* )
-      MACH="dav"
+      MACH="pronghorn"
     ;;
     *)
       echo "Can not determine machine name from hostname '$hostname'"
@@ -296,44 +296,48 @@ fi
 #-------------------------------------------------------------------------------
 
 case $MACH in
-  ## cheyenne
-  "cheyenne" )
-    module purge
-    module load intel/17.0.1 esmf_libs/7.0.0
+  ## cheyenne, geyser, caldera, or pronghorn
+  "cheyenne" |  "geyser" | "caldera" | "pronghorn" )
     if [ "$serial" == "TRUE" ]; then
       # No MPIEXEC
       if [ -z "$MPIEXEC" ]; then
         MPIEXEC=""
       fi
-      module load esmf-7.1.0r-ncdfio-uni-O
+
+      # run configure in same directory as this script
+      CWD=`pwd -P`
+      cd $SDIR
+      ../../../configure --clean
+      ../../../configure --mpilib mpi-serial
+      . .env_mach_specific.sh
+      cd $CWD
     else
-      # MPIEXEC should be mpirun -np
+      if [ "$MACH" == "cheyenne" ]; then
+        # MPIEXEC should be mpirun -np
       if [ -z "$MPIEXEC" ]; then
         if [ -z "$NCPUS" ]; then
           NCPUS=1
         fi
         MPIEXEC="mpirun -np $NCPUS"
       fi
-      module load esmf-7.1.0r-ncdfio-mpi-O
-      module load mpt/2.15f
-    fi
-    # need to load module to access ncatted
-    module load nco
-  ;;
-## geyser, caldera, or pronghorn
-  "dav" )
-    module purge
-    module load intel/17.0.1 esmflibs/7.1.0r
-    if [ "$serial" == "TRUE" ]; then
-      # No MPIEXEC
-      if [ -z "$MPIEXEC" ]; then
-        MPIEXEC=""
+
+      # run configure in same directory as this script
+      CWD=`pwd -P`
+      cd $SDIR
+      ../../../configure --clean
+      ../../../configure --mpilib mpt
+      . .env_mach_specific.sh
+      module swap mpt mpt/2.15f
+      module swap esmf-7.0.0-defio-mpi-O esmf-7.0.0-ncdfio-mpi-O
+      cd $CWD
+      else # geyser and caldera still don't work
+        echo "ERROR: Must use serial implementation of ESMF because module"
+        echo "       changes have made it difficult to run in parallel."
+        echo "       Rerun with --serial"
+        exit 1
       fi
-      module load esmf-7.1.0r-ncdfio-uni-O
-    else
-      echo "ERROR: Parallel ESMF tools are not available on $MACH, use --serial"
-      exit 1
     fi
+
     # need to load module to access ncatted
     module load nco
   ;;

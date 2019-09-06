@@ -587,7 +587,7 @@ int main(int argc, char **argv)
                 return ret;
 
             /* Finalize PIO system. */
-            if ((ret = PIOc_free_iosystem(iosysid)))
+            if ((ret = PIOc_finalize(iosysid)))
                 return ret;
         }
 
