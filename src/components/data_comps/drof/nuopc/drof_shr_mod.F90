@@ -23,8 +23,10 @@ module drof_shr_mod
   ! Public data
   !--------------------------------------------------------------------------
 
+  ! stream data type
+  type(shr_strdata_type), public :: SDROF
+
   ! input namelist variables
-  character(CL) , public :: decomp                ! decomp strategy
   character(CL) , public :: restfilm              ! model restart file namelist
   character(CL) , public :: restfils              ! stream restart file namelist
   logical       , public :: force_prognostic_true ! if true set prognostic true
@@ -34,35 +36,30 @@ module drof_shr_mod
   character(CL) , public :: rest_file_strm        ! restart filename for streams
   character(CL) , public :: datamode              ! mode
   character(len=*), public, parameter :: nullstr = 'undefined'
-  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-CONTAINS
-  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  subroutine drof_shr_read_namelists(mpicom, my_task, master_task, &
-       inst_index, inst_suffix, inst_name, &
-       logunit, SDROF, rof_present, rof_prognostic, rofice_present, flood_present)
+!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+CONTAINS
+!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  subroutine drof_shr_read_namelists(filename, mpicom, my_task, master_task, &
+       logunit, rof_present, rof_prognostic)
 
     ! !DESCRIPTION: Read in drof namelists
     implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
+    character(len=*)       , intent(in)    :: filename          ! input namelist filename
     integer(IN)            , intent(in)    :: mpicom            ! mpi communicator
     integer(IN)            , intent(in)    :: my_task           ! my task in mpi communicator mpicom
     integer(IN)            , intent(in)    :: master_task       ! task number of master task
-    integer                , intent(in)    :: inst_index        ! number of current instance (ie. 1)
-    character(len=16)      , intent(in)    :: inst_suffix       ! char string associated with instance
-    character(len=16)      , intent(in)    :: inst_name         ! fullname of current instance (ie. "lnd_0001")
     integer(IN)            , intent(in)    :: logunit           ! logging unit number
-    type(shr_strdata_type) , intent(inout) :: SDROF
     logical                , intent(out)   :: rof_present       ! flag
     logical                , intent(out)   :: rof_prognostic    ! flag
-    logical, optional      , intent(out)   :: rofice_present    ! flag
-    logical, optional      , intent(out)   :: flood_present     ! flag
 
     !--- local variables ---
-    character(CL) :: fileName    ! generic file name
     integer(IN)   :: nunit       ! unit number
     integer(IN)   :: ierr        ! error code
+    character(CL) :: decomp      ! decomp strategy - not used for NUOPC - but still needed in namelist for now
 
     !--- formats ---
     character(*), parameter :: F00   = "('(drof_comp_init) ',8a)"
@@ -74,21 +71,13 @@ CONTAINS
     !-------------------------------------------------------------------------------
 
     !----- define namelist -----
-    namelist / drof_nml / &
-        decomp, restfilm, restfils, force_prognostic_true
-
-    !----------------------------------------------------------------------------
-    ! Determine input filenamname
-    !----------------------------------------------------------------------------
-
-    filename = "drof_in"//trim(inst_suffix)
+    namelist / drof_nml / decomp, &
+         restfilm, restfils, force_prognostic_true
 
     !----------------------------------------------------------------------------
     ! Read drof_in
     !----------------------------------------------------------------------------
 
-    filename   = "drof_in"//trim(inst_suffix)
-    decomp     = "1d"
     restfilm   = trim(nullstr)
     restfils   = trim(nullstr)
     force_prognostic_true = .false.
@@ -102,12 +91,10 @@ CONTAINS
           write(logunit,F01) 'ERROR: reading input namelist, '//trim(filename)//' iostat=',ierr
           call shr_sys_abort(subName//': namelist read error '//trim(filename))
        end if
-       write(logunit,F00)' decomp     = ',trim(decomp)
        write(logunit,F00)' restfilm   = ',trim(restfilm)
        write(logunit,F00)' restfils   = ',trim(restfils)
        write(logunit,F0L)' force_prognostic_true = ',force_prognostic_true
     endif
-    call shr_mpi_bcast(decomp  ,mpicom,'decomp')
     call shr_mpi_bcast(restfilm,mpicom,'restfilm')
     call shr_mpi_bcast(restfils,mpicom,'restfils')
     call shr_mpi_bcast(force_prognostic_true,mpicom,'force_prognostic_true')
@@ -147,17 +134,6 @@ CONTAINS
     rof_prognostic = .false.
     if (force_prognostic_true) then
        rof_prognostic = .true.
-    end if
-
-    if (present(rofice_present)) then
-       rofice_present = .false.
-       if (trim(datamode) /= 'NULL') then
-          rofice_present = .true.
-       end if
-    end if
-
-    if (present(flood_present)) then 
-       flood_present  = .false.
     end if
 
   end subroutine drof_shr_read_namelists

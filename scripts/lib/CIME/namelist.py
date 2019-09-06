@@ -620,24 +620,24 @@ def literal_to_python_value(literal, type_=None):
     True
     >>> literal_to_python_value("Fortune")
     False
-    >>> literal_to_python_value("bacon")
+    >>> literal_to_python_value("bacon") # doctest: +IGNORE_EXCEPTION_DETAIL
     Traceback (most recent call last):
     ...
-    SystemExit: ERROR: 'bacon' is not a valid literal for any Fortran type.
+    CIMEError: ERROR: 'bacon' is not a valid literal for any Fortran type.
     >>> literal_to_python_value("1", type_="real")
     1.0
-    >>> literal_to_python_value("bacon", type_="logical")
+    >>> literal_to_python_value("bacon", type_="logical") # doctest: +IGNORE_EXCEPTION_DETAIL
     Traceback (most recent call last):
     ...
-    SystemExit: ERROR: 'bacon' is not a valid literal of type 'logical'.
-    >>> literal_to_python_value("1", type_="booga")
+    CIMEError: ERROR: 'bacon' is not a valid literal of type 'logical'.
+    >>> literal_to_python_value("1", type_="booga") # doctest: +IGNORE_EXCEPTION_DETAIL
     Traceback (most recent call last):
     ...
-    SystemExit: ERROR: Invalid Fortran type for a namelist: 'booga'
-    >>> literal_to_python_value("2*1")
+    CIMEError: ERROR: Invalid Fortran type for a namelist: 'booga'
+    >>> literal_to_python_value("2*1") # doctest: +IGNORE_EXCEPTION_DETAIL
     Traceback (most recent call last):
     ...
-    SystemExit: ERROR: Cannot use repetition syntax in literal_to_python_value
+    CIMEError: ERROR: Cannot use repetition syntax in literal_to_python_value
     >>> literal_to_python_value("")
     >>> literal_to_python_value("-1.D+10")
     -10000000000.0
@@ -858,15 +858,13 @@ def shouldRaise(eclass, method, *args, **kw):
     """
     try:
         method(*args, **kw)
-    except:
+    except BaseException:
         e = sys.exc_info()[1]
         if not isinstance(e, eclass):
             raise
         return
     raise Exception("Expected exception %s not raised" %
                     str(eclass))
-
-
 
 class Namelist(object):
 
@@ -965,10 +963,10 @@ class Namelist(object):
         not require a `group_name`, and it requires that the `variable_name` be
         unique across all groups.
 
-        >>> parse(text='&foo bar=1 / &bazz bar=1 /').get_value('bar')  # doctest: +ELLIPSIS
+        >>> parse(text='&foo bar=1 / &bazz bar=1 /').get_value('bar')  # doctest: +ELLIPSIS +IGNORE_EXCEPTION_DETAIL
         Traceback (most recent call last):
         ...
-        SystemExit: ERROR: Namelist.get_value: Variable {} is present in multiple groups: ...
+        CIMEError: ERROR: Namelist.get_value: Variable {} is present in multiple groups: ...
         >>> parse(text='&foo bar=1 / &bazz /').get_value('Bar')
         ['1']
         >>> parse(text='&foo bar(2)=1 / &bazz /').get_value('Bar(2)')
@@ -1133,8 +1131,7 @@ class Namelist(object):
             group_variables[name] = value
         return group_variables
 
-    def write(self, out_file, groups=None, append=False, format_='nml', sorted_groups=True,
-              skip_comps=None, atm_cpl_dt=None, ocn_cpl_dt=None):
+    def write(self, out_file, groups=None, append=False, format_='nml', sorted_groups=True, skip_comps=None):
         """Write a the output data (normally fortran namelist) to the  out_file
 
         As with `parse`, the `out_file` argument can be either a file name, or a
@@ -1156,15 +1153,13 @@ class Namelist(object):
             flag = 'a' if append else 'w'
             with open(out_file, flag) as file_obj:
                 if format_ == 'nuopc':
-                    self._write_nuopc(file_obj, groups, sorted_groups=sorted_groups,
-                                      skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
+                    self._write_nuopc(file_obj, groups, sorted_groups=sorted_groups, skip_comps=skip_comps)
                 else:
                     self._write(file_obj, groups, format_, sorted_groups=sorted_groups)
         else:
             logger.debug("Writing namelist to file object")
             if format_ == 'nuopc':
-                self._write_nuopc(out_file, groups, sorted_groups=sorted_groups,
-                                  skip_comps=skip_comps, atm_cpl_dt=atm_cpl_dt, ocn_cpl_dt=ocn_cpl_dt)
+                self._write_nuopc(out_file, groups, sorted_groups=sorted_groups, skip_comps=skip_comps)
             else:
                 self._write(out_file, groups, format_, sorted_groups=sorted_groups)
 
@@ -1183,41 +1178,41 @@ class Namelist(object):
         for group_name in group_names:
             if format_ == 'nml':
                 out_file.write("&{}\n".format(group_name))
-            group = self._groups[group_name]
-            for name in sorted(group.keys()):
-                values = group[name]
+            # allow empty group
+            if group_name in self._groups:
+                group = self._groups[group_name]
+                for name in sorted(group.keys()):
+                    values = group[name]
 
-                # @ is used in a namelist to put the same namelist variable in multiple groups
-                # in the write phase, all characters in the namelist variable name after
-                # the @ and including the @ should be removed
-                if "@" in name:
-                    name = re.sub('@.+$', "", name)
+                    # @ is used in a namelist to put the same namelist variable in multiple groups
+                    # in the write phase, all characters in the namelist variable name after
+                    # the @ and including the @ should be removed
+                    if "@" in name:
+                        name = re.sub('@.+$', "", name)
 
-                # To prettify things for long lists of values, build strings
-                # line-by-line.
-                if values[0] == "True" or values[0] == "False":
-                    values[0] = values[0].replace("True",".true.").replace("False",".false.")
-                lines = ["  {}{} {}".format(name, equals, values[0])]
-                for value in values[1:]:
-                    if value == "True" or value == "False":
-                        value = value.replace("True",".true.").replace("False",".false.")
-                    if len(lines[-1]) + len(value) <= 77:
-                        lines[-1] += ", " + value
-                    else:
-                        lines[-1] += ",\n"
-                        lines.append("      " + value)
-                lines[-1] += "\n"
-                for line in lines:
-                    out_file.write(line)
+                    # To prettify things for long lists of values, build strings
+                    # line-by-line.
+                    if values[0] == "True" or values[0] == "False":
+                        values[0] = values[0].replace("True",".true.").replace("False",".false.")
+                    lines = ["  {}{} {}".format(name, equals, values[0])]
+                    for value in values[1:]:
+                        if value == "True" or value == "False":
+                            value = value.replace("True",".true.").replace("False",".false.")
+                        if len(lines[-1]) + len(value) <= 77:
+                            lines[-1] += ", " + value
+                        else:
+                            lines[-1] += ",\n"
+                            lines.append("      " + value)
+                    lines[-1] += "\n"
+                    for line in lines:
+                        out_file.write(line)
             if format_ == 'nml':
                 out_file.write("/\n")
             if format_ == 'nmlcontents':
                 out_file.write("\n")
 
-
-    def _write_nuopc(self, out_file, groups, sorted_groups, skip_comps, atm_cpl_dt, ocn_cpl_dt):
+    def _write_nuopc(self, out_file, groups, sorted_groups, skip_comps):
         """Unwrapped version of `write` assuming that a file object is input."""
-
         if groups is None:
             groups = self._groups.keys()
 
@@ -1227,15 +1222,15 @@ class Namelist(object):
             group_names = groups
 
         for group_name in group_names:
-            if "_attributes" not in group_name and "nuopc_" not in group_name:
+            if "_attributes" not in group_name and "nuopc_" not in group_name and "_no_group" not in group_name:
                 continue
-
             if "_attributes" in group_name:
                 out_file.write("{}::\n".format(group_name))
 
             group = self._groups[group_name]
             for name in sorted(group.keys()):
                 values = group[name]
+
                 if "component_list" in name:
                     for skip_comp in skip_comps:
                         if skip_comp in values[0]:
@@ -1248,9 +1243,7 @@ class Namelist(object):
                     name = re.sub('@.+$', "", name)
 
                 equals = " ="
-                if group_name == 'nuopc_runseq':
-                    equals = '::\n       '
-                elif "_var" in group_name:
+                if "_var" in group_name:
                     equals = ':'
 
                 # To prettify things for long lists of values, build strings
@@ -1274,32 +1267,9 @@ class Namelist(object):
                 lines[-1] += "\n"
                 for line in lines:
                     line = line.replace('"','')
-                    # remove un-needed entries from the nuopc_runseq based
-                    # on the prognostic_comps and skip_comps lists
-                    if group_name == 'nuopc_runseq':
-                        run_entries = line.splitlines()
-                        newline = ""
-                        for run_entry in run_entries:
-                            print_entry = True
-                            for skip_comp in skip_comps:
-                                if "@" not in run_entry:
-                                    if skip_comp in run_entry:
-                                        print_entry = False
-                                        logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
-                                    if skip_comp.lower().strip() in run_entry:
-                                        print_entry = False
-                                        logger.info("Writing nuopc_runseq, skipping {}".format(run_entry))
-                            if print_entry:
-                                if "@atm_cpl_dt" in run_entry:
-                                    run_entry = run_entry.replace("atm_cpl_dt",atm_cpl_dt)
-                                if "@ocn_cpl_dt" in run_entry:
-                                    run_entry = run_entry.replace("ocn_cpl_dt",ocn_cpl_dt)
-                                newline += run_entry + "\n"
-                        out_file.write(newline)
-                    else:
-                        out_file.write(line)
+                    out_file.write(line)
 
-            if "_attribute" in group_name or "runseq" in group_name:
+            if "_attribute" in group_name:
                 out_file.write("::\n\n")
 
 class _NamelistEOF(Exception):
@@ -1605,7 +1575,7 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
         >>> _NamelistParser('abc ')._parse_variable_name()
         'abc'
         >>> _NamelistParser('ABC ')._parse_variable_name()
-        'abc'
+        'ABC'
         >>> _NamelistParser('abc\n')._parse_variable_name()
         'abc'
         >>> _NamelistParser('abc%fred\n')._parse_variable_name()
@@ -1614,8 +1584,8 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
         'abc(2)@fred'
         >>> _NamelistParser('abc(1:2:3)\n')._parse_variable_name()
         'abc(1:2:3)'
-        >>> _NamelistParser('abc=')._parse_variable_name()
-        'abc'
+        >>> _NamelistParser('aBc=')._parse_variable_name()
+        'aBc'
         >>> try:
         ...     _NamelistParser('abc(1,2) ')._parse_variable_name()
         ...     raise AssertionError("_NamelistParseError not raised")
@@ -1660,9 +1630,7 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
             else:
                 err_str = "{!r} is not a valid variable name".format(str(text))
             raise _NamelistParseError(err_str)
-        name = text.lower()
-
-        return name
+        return text
 
     def _parse_character_literal(self):
         """Parse and return a character literal (a string).
@@ -2060,10 +2028,10 @@ class _NamelistParser(object): # pylint:disable=too-few-public-methods
         ('foo', ['2'], False)
         >>> _NamelistParser("foo=1,2")._parse_name_and_values(allow_eof_end=True)
         ('foo', ['1', '2'], False)
-        >>> _NamelistParser("foo(1:2)=1,2,3 ")._parse_name_and_values(allow_eof_end=True)
+        >>> _NamelistParser("foo(1:2)=1,2,3 ")._parse_name_and_values(allow_eof_end=True) # doctest: +IGNORE_EXCEPTION_DETAIL
         Traceback (most recent call last):
         ...
-        SystemExit: ERROR: Too many values for array foo(1:2)
+        CIMEError: ERROR: Too many values for array foo(1:2)
         >>> _NamelistParser("foo=1,")._parse_name_and_values(allow_eof_end=True)
         ('foo', ['1', ''], False)
         >>> _NamelistParser("foo+=1")._parse_name_and_values(allow_eof_end=True)

@@ -5,7 +5,7 @@ module docn_shr_mod
   use shr_kind_mod   , only : IN=>SHR_KIND_IN, R8=>SHR_KIND_R8
   use shr_kind_mod   , only : CS=>SHR_KIND_CS, CL=>SHR_KIND_CL
   use shr_file_mod   , only : shr_file_getunit, shr_file_freeunit
-  use shr_sys_mod    , only : shr_sys_flush, shr_sys_abort
+  use shr_sys_mod    , only : shr_sys_abort
   use shr_strdata_mod, only : shr_strdata_type, shr_strdata_readnml
   use shr_mpi_mod    , only : shr_mpi_bcast
 
@@ -23,11 +23,16 @@ module docn_shr_mod
   ! Public data
   !--------------------------------------------------------------------------
 
+  ! Note that model decomp will now come from reading in the mesh directly
+
+  ! stream data type
+  type(shr_strdata_type), public :: SDOCN
+
   ! input namelist variables
-  character(CL) , public :: decomp                ! decomp strategy
   character(CL) , public :: restfilm              ! model restart file namelist
   character(CL) , public :: restfils              ! stream restart file namelist
   logical       , public :: force_prognostic_true ! if true set prognostic true
+  real(r8)      , public :: rce_sst               ! RCE SST
 
   ! variables obtained from namelist read
   character(CL) , public :: rest_file             ! restart filename
@@ -35,34 +40,29 @@ module docn_shr_mod
   character(CL) , public :: datamode              ! mode
   integer(IN)   , public :: aquap_option
   character(len=*), public, parameter :: nullstr = 'undefined'
-  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-CONTAINS
-  !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  subroutine docn_shr_read_namelists(mpicom, my_task, master_task, &
-       inst_index, inst_suffix, inst_name, &
-       logunit, SDOCN, ocn_present, ocn_prognostic, ocnrof_prognostic)
+!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+CONTAINS
+!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  subroutine docn_shr_read_namelists(filename, mpicom, my_task, master_task, &
+       logunit, ocn_prognostic)
 
     ! !DESCRIPTION: Read in docn namelists
     implicit none
 
     ! !INPUT/OUTPUT PARAMETERS:
+    character(len=*)       , intent(in)    :: filename          ! input namelist filename
     integer(IN)            , intent(in)    :: mpicom            ! mpi communicator
     integer(IN)            , intent(in)    :: my_task           ! my task in mpi communicator mpicom
     integer(IN)            , intent(in)    :: master_task       ! task number of master task
-    integer                , intent(in)    :: inst_index        ! number of current instance (ie. 1)
-    character(len=16)      , intent(in)    :: inst_suffix       ! char string associated with instance
-    character(len=16)      , intent(in)    :: inst_name         ! fullname of current instance (ie. "lnd_0001")
     integer(IN)            , intent(in)    :: logunit           ! logging unit number
-    type(shr_strdata_type) , intent(inout) :: SDOCN
-    logical                , intent(out)   :: ocn_present       ! flag
     logical                , intent(out)   :: ocn_prognostic    ! flag
-    logical                , intent(out)   :: ocnrof_prognostic ! flag
 
     !--- local variables ---
-    character(CL) :: fileName    ! generic file name
     integer(IN)   :: nunit       ! unit number
     integer(IN)   :: ierr        ! error code
+    character(CL) :: decomp      ! decomp strategy - not used for NUOPC - but still needed in namelist for now
 
     !--- formats ---
     character(*), parameter :: F00   = "('(docn_comp_init) ',8a)"
@@ -74,24 +74,18 @@ CONTAINS
     !-------------------------------------------------------------------------------
 
     !----- define namelist -----
-    namelist / docn_nml / &
-         decomp, restfilm, restfils, force_prognostic_true
-
-    !----------------------------------------------------------------------------
-    ! Determine input filenamname
-    !----------------------------------------------------------------------------
-
-    filename = "docn_in"//trim(inst_suffix)
+    namelist / docn_nml / decomp, &
+         restfilm, restfils, force_prognostic_true, rce_sst
 
     !----------------------------------------------------------------------------
     ! Read docn_in
     !----------------------------------------------------------------------------
 
-    filename   = "docn_in"//trim(inst_suffix)
-    decomp     = "1d"
     restfilm   = trim(nullstr)
     restfils   = trim(nullstr)
     force_prognostic_true = .false.
+    rce_sst    = 26.85_r8   ! degrees C 300 - 273.15 = 26.85
+
     if (my_task == master_task) then
        nunit = shr_file_getUnit() ! get unused unit number
        open (nunit,file=trim(filename),status="old",action="read")
@@ -102,15 +96,15 @@ CONTAINS
           write(logunit,F01) 'ERROR: reading input namelist, '//trim(filename)//' iostat=',ierr
           call shr_sys_abort(subName//': namelist read error '//trim(filename))
        end if
-       write(logunit,F00)' decomp     = ',trim(decomp)
        write(logunit,F00)' restfilm   = ',trim(restfilm)
        write(logunit,F00)' restfils   = ',trim(restfils)
        write(logunit,F0L)' force_prognostic_true = ',force_prognostic_true
+       write(logunit,F02)' rce_sst = ',rce_sst
     endif
-    call shr_mpi_bcast(decomp  ,mpicom,'decomp')
     call shr_mpi_bcast(restfilm,mpicom,'restfilm')
     call shr_mpi_bcast(restfils,mpicom,'restfils')
     call shr_mpi_bcast(force_prognostic_true,mpicom,'force_prognostic_true')
+    call shr_mpi_bcast(rce_sst,mpicom,'rce_sst')
 
     rest_file = trim(restfilm)
     rest_file_strm = trim(restfils)
@@ -139,7 +133,7 @@ CONTAINS
 
     ! Validate mode
 
-    if (trim(datamode) == 'NULL'          .or. &
+    if ( trim(datamode) == 'NULL'          .or. &
          trim(datamode) == 'SSTDATA'       .or. &
          trim(datamode) == 'SST_AQUAPANAL' .or. &
          trim(datamode) == 'SST_AQUAPFILE' .or. &
@@ -159,11 +153,6 @@ CONTAINS
     ! Determine present and prognostic flag
     !----------------------------------------------------------------------------
 
-    ocn_present = .true.
-    if (trim(datamode) == 'NULL') then
-       ocn_present = .false.
-    end if
-
     ocn_prognostic = .false.
     if (force_prognostic_true) then
        ocn_prognostic  = .true.
@@ -175,11 +164,6 @@ CONTAINS
        ocn_prognostic = .true.
     endif
 
-    ocnrof_prognostic = .false.
-    if (force_prognostic_true .or. (trim(datamode) == 'IAF')) then
-       ocnrof_prognostic = .true.
-    end if
-       
   end subroutine docn_shr_read_namelists
 
 end module docn_shr_mod

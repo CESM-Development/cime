@@ -110,11 +110,13 @@ def _case_setup_impl(case, caseroot, clean=False, test_mode=False, reset=False):
         if not os.path.isfile("Macros.make") or not os.path.isfile("env_mach_specific.xml"):
             configure(Machines(machine=mach), caseroot, ["Makefile"], compiler, mpilib, debug, comp_interface, sysos)
 
+        # Also write out Cmake macro file
+        if not os.path.isfile("Macros.cmake"):
+            configure(Machines(machine=mach), caseroot, ["CMake"], compiler, mpilib, debug, comp_interface, sysos)
+
         # Set tasks to 1 if mpi-serial library
         if mpilib == "mpi-serial":
-            for vid, value in case:
-                if vid.startswith("NTASKS") and value != 1:
-                    case.set_value(vid, 1)
+            case.set_value("NTASKS", 1)
 
         # Check ninst.
         # In CIME there can be multiple instances of each component model (an ensemble) NINST is the instance of that component.
@@ -141,7 +143,8 @@ def _case_setup_impl(case, caseroot, clean=False, test_mode=False, reset=False):
                         case.set_value("NTASKS_{}".format(comp), ninst)
                         ntasks = ninst
                     else:
-                        expect(False, "NINST_{} value {:d} greater than NTASKS_{} {:d}".format(comp, ninst, comp, ntasks))
+                        expect(False, "NINST_{comp} value {ninst} greater than NTASKS_{comp} {ntasks}".format(comp=comp, ninst=ninst, ntasks=ntasks))
+
                 case.set_value("NTASKS_PER_INST_{}".format(comp), max(1,int(ntasks / ninst)))
 
         if os.path.exists(get_batch_script_for_job(case.get_primary_job())):
@@ -235,7 +238,7 @@ def case_setup(self, clean=False, test_mode=False, reset=False):
         with TestStatus(test_dir=caseroot, test_name=test_name) as ts:
             try:
                 run_and_log_case_status(functor, phase, caseroot=caseroot)
-            except:
+            except BaseException: # Want to catch KeyboardInterrupt too
                 ts.set_status(SETUP_PHASE, TEST_FAIL_STATUS)
                 raise
             else:
